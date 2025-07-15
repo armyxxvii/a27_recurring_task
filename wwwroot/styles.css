@@ -1,132 +1,175 @@
 ﻿/* ---------- Global Reset ---------- */
 * {
-  box-sizing: border-box;
+    box-sizing: border-box;
 }
 
 body {
-  margin: 0;
-  padding: 2rem;
-  font-family: sans-serif;
-  background: #f5f5f5;
+    margin: 0;
+    padding: 1rem;
+    font-family: sans-serif;
+    background: #f5f5f5;
 }
 
 /* ---------- Container & Title ---------- */
 .container {
-  margin: 0 auto;
-  background: #fff;
-  padding: 1.5rem;
-  border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin: 0 auto;
+    background: #fff;
+    padding: 1.5rem;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 h1 {
-  margin: 0 0 1rem;
-  font-size: 1.8rem;
-  text-align: center;
+    margin: 0 0 1rem;
+    font-size: 1.8rem;
+    text-align: center;
 }
+
+.file-controls {
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+#open-file-btn {
+    font-size: 1rem;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+}
+
 
 /* ---------- Form ---------- */
 form {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem 0 0;
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem 0 0;
 }
 
-form input,
-form button {
-  padding: 0.5rem;
-  font-size: 1rem;
-}
+    form input,
+    form button {
+        padding: 0.5rem;
+        font-size: 1rem;
+    }
 
-form input {
-  flex: 1;
-}
+    form input {
+        flex: 1;
+    }
 
-form button {
-  cursor: pointer;
-}
+    form button {
+        cursor: pointer;
+    }
 
 /* ---------- Table Wrapper ---------- */
 .table-wrapper {
-  overflow-x: auto;
-  margin-bottom: 1rem;
+    overflow-x: auto;
+    margin-bottom: 1rem;
 }
 
 /* ---------- Calendar Table ---------- */
 #calendar-table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
-  font-size: 0.85rem;
-  min-width: 1200px;
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 0.85rem;
+    min-width: 1200px;
 }
 
-#calendar-table col.task-col {
-  width: 200px;
-}
+    #calendar-table col.task-col {
+        width: 200px;
+    }
 
-#calendar-table col.action-col {
-  width: 120px;
-}
+    #calendar-table col.action-col {
+        width: 80px;
+    }
 
-#calendar-table th,
-#calendar-table td {
-  border: 1px solid #ddd;
-  padding: 0.3rem;
-  text-align: center;
-  vertical-align: middle;
-  overflow: hidden;
-  white-space: nowrap;
-  min-width: 80px;
-}
+    #calendar-table col.task-cell {
+        width: 45px;
+        text-align: left;
+        padding-left: 0.5rem;
+        white-space: normal;
+    }
 
-#calendar-table thead th {
-  background: #fafafa;
-  position: sticky;
-  top: 0;
-}
+    #calendar-table th,
+    #calendar-table td {
+        border: 1px solid #ddd;
+        padding: 0.3rem;
+        text-align: center;
+        vertical-align: middle;
+        overflow: hidden;
+        white-space: nowrap;
+    }
 
-td.task-cell {
-  text-align: left;
-  padding-left: 0.5rem;
-  white-space: normal;
-}
+    #calendar-table thead th {
+        background: #fafafa;
+        position: sticky;
+        top: 0;
+    }
 
-/* ---------- Status Cells ---------- */
-td.done {
-  background: #d4edda;
-}
-
-td.pending {
-  background: #fff3cd;
-}
-
-td.overdue {
-  background: #f8d7da;
-  font-weight: bold;
-}
-td.outdate {
-    background: #808080;
-}
+        #calendar-table thead th.today {
+            background: #fa8686;
+        }
 
 /* ---------- Action Column & Buttons ---------- */
 /* 只針對功能欄做緊密排列 */
 td.action-cell {
-  padding: 0;            /* 去除格子內邊距 */
-  text-align: center;
+    padding: 0; /* 去除格子內邊距 */
+    text-align: center;
 }
 
-td.action-cell .icon-btn {
-  background: none;
-  border: none;
-  padding: 0;            /* 去除按鈕內邊距 */
-  margin: 0 1px;         /* 最小水平間距 */
-  font-size: 1em;        /* 跟文字同大小 */
-  line-height: 1;
-  cursor: pointer;
+    td.action-cell .icon-btn {
+        background: none;
+        border: none;
+        padding: 0; /* 去除按鈕內邊距 */
+        margin: 0; /* 最小水平間距 */
+        font-size: 1em; /* 跟文字同大小 */
+        line-height: 1;
+        cursor: pointer;
+    }
+
+        td.action-cell .icon-btn:hover {
+            font-size: 1.1em;
+        }
+
+/* ---------- Status Cells ---------- */
+.done {
+    background: #94f88e;
 }
 
-td.action-cell .icon-btn:hover {
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 3px;
+.pending {
+    background: #eeffdd;
 }
+
+.overdue {
+    background: #fa8686;
+    color: darkred;
+}
+
+.outdate {
+    background: #a0a0a0;
+}
+
+/* ---------- toast ---------- */
+
+#save-toast {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    background: #4caf50;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    opacity: 0;
+    transition: opacity 0.4s;
+    pointer-events: none;
+    z-index: 9999;
+}
+
+    #save-toast.show {
+        opacity: 1;
+    }
+
+.hidden {
+    display: none !important;
+}
+

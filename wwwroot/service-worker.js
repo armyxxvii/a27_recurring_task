@@ -1,4 +1,4 @@
-const CACHE_NAME = "a27_task_cache_v1";
+﻿const CACHE_NAME = "a27_task_cache_v1";
 const urlsToCache = [
   "index.html",
   "styles.css",
@@ -8,14 +8,12 @@ const urlsToCache = [
   "icon-512.png"
 ];
 
-self.addEventListener("install", event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
-  );
+self.addEventListener("install", e => {
+    e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(ASSETS)));
 });
 
-self.addEventListener("fetch", event => {
-  event.respondWith(
-    caches.match(event.request).then(resp => resp || fetch(event.request))
-  );
+self.addEventListener("fetch", e => {
+    e.respondWith(
+        caches.match(e.request).then(r => r || fetch(e.request))
+    );
 });
