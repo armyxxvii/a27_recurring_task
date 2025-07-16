@@ -1,57 +1,35 @@
 ﻿<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="theme-color" content="#ffffff" />
-    <title>任務循環行事曆</title>
-    <link rel="stylesheet" href="styles.css" />
-    <link rel="manifest" href="manifest.json" />
-    <script>
-        if ("serviceWorker" in navigator) {
-            navigator.serviceWorker.register("service-worker.js");
-        }
-    </script>
-    <!--
-    -->
+    <meta charset="UTF-8">
+    <title>任務樹 × 循環行事曆</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 </head>
 <body>
     <div class="container">
-        <h1>任務循環行事曆</h1>
-
-        <!-- 開啟檔案 -->
+        <h1>任務管理中心</h1>
         <div class="file-controls">
-            <button id="open-file-btn">📂 開啟檔案</button>
+            <button id="open-file-btn">開啟任務 JSON</button>
         </div>
 
-        <!-- 可水平捲動的表格容器 -->
-        <div class="table-wrapper hidden">
-            <table id="calendar-table">
-                <colgroup>
-                    <col class="task-col" />             <!-- 任務欄 -->
-                    <col class="action-col" />           <!-- 功能欄 -->
-                    <col class="task-cell" span="31" />  <!-- ±15 天日期欄 -->
-                </colgroup>
-                <thead>
-                    <tr id="date-header">
-                        <th>任務</th>
-                        <th>功能</th>
-                        <!-- JS 自動插入 31 欄 mm/dd -->
-                    </tr>
-                </thead>
-                <tbody id="calendar-body"></tbody>
-            </table>
-        </div>
+        <div class="scroll-sync">
+            <!-- 左欄：任務樹 -->
+            <div class="tree-column">
+                <div id="task-tree-root"></div>
+            </div>
 
-        <!-- 任務新增表單 -->
-        <form id="task-form" class="hidden">
-            <input type="text" id="task-name" placeholder="任務名稱" required />
-            <input type="number" id="interval-days" placeholder="週期（天）" min="1" required />
-            <button type="submit">新增任務</button>
-        </form>
+            <!-- 右欄：行事曆格子 -->
+            <div class="calendar-column">
+                <table id="calendar-table">
+                    <thead><tr id="date-header"></tr></thead>
+                    <tbody id="calendar-body"></tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
+    <div id="save-toast">已儲存</div>
     <script src="script.js"></script>
-
-    <div id="save-toast">✅ 已儲存</div>
 </body>
 </html>
