@@ -11,52 +11,65 @@ body {
 }
 
 .container {
-    margin: auto;
+    margin-bottom: 0.7rem;
     max-width: 100%;
     background: #fff;
-    padding: 1.5rem;
+    padding: 0.5rem;
     border-radius: 6px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
-h1 {
-    font-size: 1.6rem;
-    margin-bottom: 1rem;
-    text-align: center;
+.title-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap; /* RWD */
 }
 
-.file-controls {
-    text-align: center;
-    margin-bottom: 1rem;
+    .title-bar h1 {
+        font-size: 1.6rem;
+        margin: 0;
+        flex-shrink: 1;
+    }
+
+#controls {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
 }
 
-#open-file-btn {
-    padding: 0.5rem 1rem;
-    font-size: 1rem;
-    cursor: pointer;
-}
+    #controls button,
+    #controls input[type="file"] {
+        font-size: 0.9rem;
+        padding: 0.3rem 0.6rem;
+        border: none;
+        background: #e7e7e7;
+        cursor: pointer;
+        border-radius: 4px;
+    }
+
+        #controls button:hover {
+            background: #d0d0ff;
+        }
 
 /* 共用捲軸區域 */
 .scroll-sync {
     display: flex;
     overflow-y: auto;
-    max-height: 600px;
-    border-top: 1px solid #ccc;
 }
 
 /* 左欄：任務樹 */
 .tree-column {
     flex-shrink: 0;
     width: 300px;
-    border-right: 1px solid #ddd;
-    padding: 1rem 0.5rem 0 0.5rem;
+    padding: 1rem 0.5rem 0 0;
+    border: none;
 }
 
 ul.task-tree {
     list-style: none;
     padding-left: 0.5rem;
     margin-left: 0.45rem;
-    border-left: 2px dashed #ccc;
 }
 
 .task-line {
@@ -93,18 +106,6 @@ ul.task-tree {
     text-overflow: ellipsis;
 }
 
-.controls button {
-    font-size: 0.6rem;
-    padding: 0;
-    border: none;
-    background: #e7e7e7;
-    cursor: pointer;
-}
-
-    .controls button:hover {
-        background: #d0d0ff;
-    }
-
 /* 底部新增按鈕 */
 .add-row {
     height: 25px;
@@ -132,7 +133,6 @@ ul.task-tree {
 }
 
 #calendar-table {
-    width: 100%;
     border-collapse: collapse;
     table-layout: fixed;
     font-size: 0.85rem;
@@ -142,7 +142,7 @@ ul.task-tree {
         border: 1px solid #ddd;
         text-align: center;
         white-space: nowrap;
-        min-width: 50px;
+        min-width: 45px;
         height: 25px;
         vertical-align: middle;
     }

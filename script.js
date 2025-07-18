@@ -12,13 +12,45 @@ let fileHandle = null;
 let today;
 
 // 2. File I/O: open, save & toast
+function checkFileSystemSupport() {
+    const supported = !!window.showOpenFilePicker;
+    const controls = document.getElementById("controls");
+    controls.innerHTML = "";
+
+    if (supported) {
+        const openBtn = document.createElement("button");
+        openBtn.textContent = "開啟任務 JSON";
+        openBtn.onclick = openFile;
+        controls.appendChild(openBtn);
+    } else {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".json";
+        input.onchange = inputFile;
+        controls.appendChild(input);
+
+        const saveBtn = document.createElement("button");
+        saveBtn.textContent = "下載任務檔";
+        saveBtn.onclick = downloadFile;
+        controls.appendChild(saveBtn);
+    }
+}
+
 async function openFile() {
     [fileHandle] = await window.showOpenFilePicker({
         types: [{ description: "JSON", accept: { "application/json": [".json"] } }]
     });
     const file = await fileHandle.getFile();
     const text = await file.text();
-    today = parseDate(new Date());
+    tasks = text.trim() ? JSON.parse(text) : [];
+    refreshAll();
+    showToast("已載入任務");
+}
+
+async function inputFile() {
+    const file = input.files[0];
+    if (!file) return;
+    const text = await file.text();
     tasks = text.trim() ? JSON.parse(text) : [];
     refreshAll();
     showToast("已載入任務");
@@ -33,6 +65,24 @@ async function saveFile() {
     await w.write(JSON.stringify(tasks, null, 2));
     await w.close();
     showToast("已儲存");
+}
+
+async function downloadFile() {
+    sortDates();
+
+    const json = JSON.stringify(tasks, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "tasks.json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showToast("已下載任務檔");
 }
 
 function showToast(msg = "已儲存") {
@@ -65,6 +115,7 @@ function parseDate(input) {
     }
     return new Date(input);
 }
+
 function sortDates() {
     function recurSort(list) {
         list.forEach(task => {
@@ -78,7 +129,6 @@ function sortDates() {
     }
     recurSort(tasks);
 }
-
 
 function isToday(d) {
     return d.getFullYear() === today.getFullYear()
@@ -118,7 +168,8 @@ function flattenTasks(data, parentPath = [], visible = true) {
     });
     return list;
 }
-// 3.5. 根據 path 陣列找到對應的任務以及父陣列
+
+// 根據 path 陣列找到對應的任務以及父陣列
 function getTaskByPath(path) {
     let ref = tasks;
     // path: [0,2,1] 代表 tasks[0].children[2].children[1]
@@ -130,6 +181,13 @@ function getTaskByPath(path) {
         index: path[path.length - 1],
         task: ref[path[path.length - 1]]
     };
+}
+
+function refreshAll() {
+    today = parseDate(new Date());
+    treeRoot.innerHTML = "";
+    renderTree(tasks, treeRoot);
+    renderCalendar();
 }
 
 
@@ -257,6 +315,11 @@ function generateDates(before = 15, after = 15) {
 }
 
 // 5. Event delegation & init
+document.addEventListener("DOMContentLoaded", () => {
+    checkFileSystemSupport();
+    //refreshAll();
+});
+
 treeRoot.addEventListener("click", e => {
     const btn = e.target.closest("button");
     const li = btn?.closest(".task-node, .add-row");
@@ -366,13 +429,3 @@ calTable.addEventListener("click", async e => {
     await saveFile();
     refreshAll();
 });
-
-// Open file on click
-openBtn.addEventListener("click", openFile);
-
-// refreshAll
-function refreshAll() {
-    treeRoot.innerHTML = "";
-    renderTree(tasks, treeRoot);
-    renderCalendar();
-}
