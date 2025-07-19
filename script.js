@@ -53,15 +53,15 @@ async function openFile() {
         types: [{ description: "JSON", accept: { "application/json": [".json"] } }]
     });
     const file = await fileHandle.getFile();
-    const text = await file.text();
-    tasks = text.trim() ? JSON.parse(text) : [];
-    refreshAll();
-    showToast("已載入任務");
+    if (file) await loadFile(file);
 }
 
-async function inputFile() {
-    const file = input.files[0];
-    if (!file) return;
+async function inputFile(event) {
+    const file = event.target.files[0];
+    if (file) await loadFile(file);
+}
+
+async function loadFile(file) {
     const text = await file.text();
     tasks = text.trim() ? JSON.parse(text) : [];
     refreshAll();
@@ -239,7 +239,7 @@ function renderTree(data, parentEl, path = []) {
         const ctr = document.createElement("span");
         ctr.className = "controls";
         ctr.innerHTML = `
-        <button class="color-trigger" title="設定底色" style="background:${task.bgColor || "transparent"}">🎨</button>
+      <button class="color-trigger" title="設定底色" style="background:${task.bgColor || "transparent"}">🎨</button>
       <button class="edit-btn" title="編輯名稱與週期">✏️</button>
       <button class="delete-btn" title="刪除">❌</button>
       <button class="add-child-btn" title="新增子任務">➕</button>`;
