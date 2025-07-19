@@ -232,6 +232,23 @@ function renderTree(data, parentEl, path = []) {
         }
 
         ul.appendChild(li);
+
+        new Sortable(ul, {
+            animation: 150,
+            handle: ".task-title", // 或其他控制區域
+            filter: ".add-row", // 排除 .add-row
+            onEnd(evt) {
+                const li = evt.item.closest(".task-node");
+                const parentPath = li.dataset.path.split(",").map(n => +n);
+                const { parent } = getTaskByPath([...parentPath]);
+
+                const moved = parent.splice(evt.oldIndex, 1)[0];
+                parent.splice(evt.newIndex, 0, moved);
+
+                saveFile();
+                refreshAll();
+            }
+        });
     });
 
     const addLi = document.createElement("li");
