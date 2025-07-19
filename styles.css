@@ -100,7 +100,7 @@ ul.task-tree {
 }
 
 .controls button {
-    font-size: 0.8rem;
+    font-size: 0.6rem;
     padding: 0.1rem;
     border: none;
     background: #e7e7e7;
@@ -165,27 +165,55 @@ ul.task-tree {
         pointer-events: none;
     }
 
+/* 顏色選擇器 */
+.color-popup {
+    position: absolute;
+    display: flex;
+    gap: 0.3rem;
+    background: #fff;
+    padding: 0.4rem;
+    border: 1px solid #ccc;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    border-radius: 6px;
+    z-index: 1000;
+}
+
+.color-option {
+    width: 18px;
+    height: 18px;
+    border: 1px solid #888;
+    border-radius: 4px;
+    cursor: pointer;
+    padding: 0;
+}
+
+    .color-option.selected {
+        outline: 2px solid #333;
+        box-shadow: 0 0 2px #000;
+    }
+
+
 /* 狀態格顏色 */
 .done-past {
     background: #94f88e;
 }
 
 .done-future {
-    background: #f1cab7;
+    background: #f1cab7cc;
 }
 
 
 .pending {
-    background: #eeffdd;
+    background: #ccfdc9cc;
 }
 
 .overdue {
-    background: #fa8686;
+    background: #fa868688;
     color: darkred;
 }
 
 .outdate {
-    background: #a0a0a0;
+    background: #88888888;
 }
 
 /* 提示儲存完成 */

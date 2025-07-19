@@ -6,6 +6,18 @@ const dateHead = document.getElementById("date-header");
 const calBody = document.getElementById("calendar-body");
 const toast = document.getElementById("save-toast");
 const farFuture = "2700-02-27";
+const colors = [
+    "",           // 無底色
+    "#f44336",    // 鮮紅（Red）
+    "#ff9800",    // 橘色（Orange）
+    "#ffeb3b",    // 黃色（Yellow）
+    "#4caf50",    // 綠色（Green）
+    "#00bcd4",    // 青色（Cyan）
+    "#2196f3",    // 藍色（Blue）
+    "#3f51b5",    // 靛色（Indigo）
+    "#9c27b0",    // 紫色（Purple）
+    "#795548",    // 棕色（Brown）
+];
 
 let tasks = [];
 let fileHandle = null;
@@ -207,11 +219,18 @@ function renderTree(data, parentEl, path = []) {
         const toggleBtn = document.createElement("button");
         toggleBtn.className = "toggle-btn";
         toggleBtn.innerHTML = `<span>${task.collapsed ? "⯈" : "⯆"}</span>`;
-        toggleBtn.onclick = () => {
-            task.collapsed = !task.collapsed;
-            saveFile();
-            refreshAll();
-        };
+
+        const hasChildren = Array.isArray(task.children) && task.children.length > 0;
+        if (!hasChildren) {
+            toggleBtn.disabled = true;
+            task.collapsed = true;
+        } else {
+            toggleBtn.onclick = () => {
+                task.collapsed = !task.collapsed;
+                saveFile();
+                refreshAll();
+            };
+        }
 
         const titleSpan = document.createElement("span");
         titleSpan.className = "task-title";
@@ -220,6 +239,7 @@ function renderTree(data, parentEl, path = []) {
         const ctr = document.createElement("span");
         ctr.className = "controls";
         ctr.innerHTML = `
+        <button class="color-trigger" title="設定底色" style="background:${task.bgColor || "transparent"}">🎨</button>
       <button class="edit-btn" title="編輯名稱與週期">✏️</button>
       <button class="delete-btn" title="刪除">❌</button>
       <button class="add-child-btn" title="新增子任務">➕</button>`;
@@ -263,6 +283,35 @@ function renderTree(data, parentEl, path = []) {
 
     parentEl.appendChild(ul);
 }
+function showColorPicker(triggerBtn, task) {
+    const existing = document.getElementById("color-popup");
+    if (existing) existing.remove(); // 清除其他視窗
+
+    const popup = document.createElement("div");
+    popup.id = "color-popup";
+    popup.className = "color-popup";
+    colors.forEach(c => {
+        const btn = document.createElement("button");
+        btn.className = "color-option";
+        btn.style.background = c || "transparent";
+        if (task.bgColor === c) btn.classList.add("selected");
+        btn.title = c || "無底色";
+        btn.onclick = () => {
+            task.bgColor = c || null;
+            popup.remove();
+            saveFile();
+            refreshAll();
+        };
+        popup.appendChild(btn);
+    });
+
+    document.body.appendChild(popup);
+
+    // 對齊按鈕位置（絕對定位）
+    const rect = triggerBtn.getBoundingClientRect();
+    popup.style.top = `${rect.bottom + window.scrollY}px`;
+    popup.style.left = `${rect.left + window.scrollX}px`;
+}
 
 // 4b. Render calendar grid
 function renderCalendar() {
@@ -280,6 +329,7 @@ function renderCalendar() {
     calBody.innerHTML = "";
     flattenTasks(tasks).forEach(task => {
         const tr = document.createElement("tr");
+        tr.style.background = task.bgColor || "transparent";
 
         if (task.isSpacer) {
             const spacerTd = document.createElement("td");
@@ -366,6 +416,27 @@ treeRoot.addEventListener("click", e => {
         }
     }
 
+    // edit
+    if (btn.matches(".edit-btn")) {
+        const { task } = getTaskByPath(path);
+        const n = prompt("修改名稱？", task.title);
+        if (n) task.title = n.trim();
+        const v = prompt("修改週期？", task.intervalDays);
+        const iv = +v; if (!isNaN(iv) && iv > 0) task.intervalDays = iv;
+    }
+
+    // delete
+    if (btn.matches(".delete-btn")) {
+        const { parent, index } = getTaskByPath(path);
+        if (confirm("刪除？")) parent.splice(index, 1);
+    }
+
+    // color trigger
+    if (btn.matches(".color-trigger")) {
+        const { task } = getTaskByPath(path);
+        showColorPicker(btn, task);
+    }
+
     // add sibling
     if (btn.matches(".add-sibling-tail-btn")) {
         const t = prompt("任務名稱？");
@@ -378,19 +449,6 @@ treeRoot.addEventListener("click", e => {
             collapsed: false,
             children: []
         });
-    }
-
-    // edit or delete
-    if (btn.matches(".edit-btn")) {
-        const { task } = getTaskByPath(path);
-        const n = prompt("修改名稱？", task.title);
-        if (n) task.title = n.trim();
-        const v = prompt("修改週期？", task.intervalDays);
-        const iv = +v; if (!isNaN(iv) && iv > 0) task.intervalDays = iv;
-    }
-    if (btn.matches(".delete-btn")) {
-        const { parent, index } = getTaskByPath(path);
-        if (confirm("刪除？")) parent.splice(index, 1);
     }
 
     saveFile();
