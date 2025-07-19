@@ -62,21 +62,21 @@ body {
 .tree-column {
     flex-shrink: 0;
     width: 300px;
-    padding: 1rem 0.5rem 0 0;
+    padding: 25px 4px 0 0;
     border: none;
 }
 
 ul.task-tree {
     list-style: none;
-    padding-left: 0.5rem;
-    margin-left: 0.45rem;
+    padding-left: 1rem;
+    margin: 0;
 }
 
 .task-line {
     height: 25px;
     display: flex;
     align-items: center;
-    gap: 0.3rem;
+    gap: 0rem;
 }
 
 .task-node {
@@ -84,19 +84,12 @@ ul.task-tree {
 }
 
 .toggle-btn {
-    width: 20px;
-    height: 20px;
+    font-size: 1rem;
     background: none;
     border: none;
     cursor: pointer;
     padding: 0;
 }
-
-    .toggle-btn .chevron {
-        display: inline-block;
-        font-size: 1rem;
-        color: #888;
-    }
 
 .task-title {
     flex: 1;
@@ -106,6 +99,19 @@ ul.task-tree {
     text-overflow: ellipsis;
 }
 
+.controls button {
+    font-size: 0.8rem;
+    padding: 0.1rem;
+    border: none;
+    background: #e7e7e7;
+    cursor: pointer;
+}
+
+    .controls button:hover {
+        background: #d0d0ff;
+    }
+
+
 /* 底部新增按鈕 */
 .add-row {
     height: 25px;
@@ -113,8 +119,8 @@ ul.task-tree {
 }
 
 .add-sibling-tail-btn {
-    width: 20px;
-    margin-left: 1.1rem;
+    height: 20px;
+    width: 100%;
     padding: 0;
     background: #e0e0ff;
     border: none;
@@ -129,7 +135,7 @@ ul.task-tree {
 .calendar-column {
     flex-grow: 1;
     overflow-x: auto;
-    padding: 0.5rem;
+    padding: 0rem;
 }
 
 #calendar-table {
@@ -152,12 +158,12 @@ ul.task-tree {
         color: white;
     }
 
-.spacer-row {
-    height: 25px;
-    background: transparent;
-    border: none;
-    pointer-events: none;
-}
+    #calendar-table td.spacer-row {
+        height: 25px;
+        background: transparent;
+        border: none;
+        pointer-events: none;
+    }
 
 /* 狀態格顏色 */
 .done-past {

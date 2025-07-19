@@ -206,7 +206,7 @@ function renderTree(data, parentEl, path = []) {
 
         const toggleBtn = document.createElement("button");
         toggleBtn.className = "toggle-btn";
-        toggleBtn.innerHTML = `<span class="chevron">${task.collapsed ? "▶" : "▼"}</span>`;
+        toggleBtn.innerHTML = `<span>${task.collapsed ? "⯈" : "⯆"}</span>`;
         toggleBtn.onclick = () => {
             task.collapsed = !task.collapsed;
             saveFile();
@@ -220,9 +220,9 @@ function renderTree(data, parentEl, path = []) {
         const ctr = document.createElement("span");
         ctr.className = "controls";
         ctr.innerHTML = `
-      <button class="edit-btn">✏️</button>
-      <button class="delete-btn">🗑️</button>
-      <button class="add-child-btn">➕</button>`;
+      <button class="edit-btn" title="編輯名稱與週期">✏️</button>
+      <button class="delete-btn" title="刪除">❌</button>
+      <button class="add-child-btn" title="新增子任務">➕</button>`;
 
         line.append(toggleBtn, titleSpan, ctr);
         li.appendChild(line);
@@ -240,6 +240,7 @@ function renderTree(data, parentEl, path = []) {
     const addBtn = document.createElement("button");
     addBtn.className = "add-sibling-tail-btn";
     addBtn.textContent = "➕";
+    addBtn.title = "新增同級任務";
     addLi.appendChild(addBtn);
     ul.appendChild(addLi);
 
