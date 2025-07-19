@@ -61,7 +61,8 @@ body {
 /* 左欄：任務樹 */
 .tree-column {
     flex-shrink: 0;
-    width: 300px;
+    width: 50%;
+    max-width: 300px;
     padding: 25px 4px 0 0;
     border: none;
 }
@@ -102,7 +103,7 @@ ul.task-tree {
 .controls button {
     font-size: 0.6rem;
     padding: 0.1rem;
-    border: none;
+    border: 1px #e7e7e7;
     background: #e7e7e7;
     cursor: pointer;
 }
