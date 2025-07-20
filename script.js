@@ -21,6 +21,7 @@ const colors = [
 
 let tasks = [];
 let fileHandle = null;
+let currentFilename = "tasks.json";
 let today;
 
 // 2. File I/O: open, save & toast
@@ -62,6 +63,7 @@ async function inputFile(event) {
 }
 
 async function loadFile(file) {
+    currentFilename = file.name;
     const text = await file.text();
     tasks = text.trim() ? JSON.parse(text) : [];
     refreshAll();
@@ -88,7 +90,7 @@ async function downloadFile() {
 
     const a = document.createElement("a");
     a.href = url;
-    a.download = "tasks.json";
+    a.download = currentFilename || "tasks.json";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
