@@ -63,6 +63,7 @@ body {
     flex-shrink: 0;
     width: 50%;
     max-width: 300px;
+    margin-left: -1rem;
     padding: 25px 4px 0 0;
     border: none;
 }
@@ -119,7 +120,7 @@ ul.task-tree {
     align-content: center;
 }
 
-.add-sibling-tail-btn {
+.add-root-task-btn {
     height: 20px;
     width: 100%;
     padding: 0;
@@ -128,7 +129,7 @@ ul.task-tree {
     cursor: pointer;
 }
 
-    .add-sibling-tail-btn:hover {
+    .add-root-task-btn:hover {
         background: #d0d0ff;
     }
 
@@ -166,31 +167,57 @@ ul.task-tree {
         pointer-events: none;
     }
 
-/* 顏色選擇器 */
-.color-popup {
-    position: absolute;
-    display: flex;
-    gap: 0.3rem;
+
+.task-editor {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     background: #fff;
-    padding: 0.4rem;
-    border: 1px solid #ccc;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-    border-radius: 6px;
+    border: 1px solid #999;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    padding: 1rem;
     z-index: 1000;
+    border-radius: 8px;
+    width: 250px;
 }
 
-.color-option {
-    width: 18px;
-    height: 18px;
-    border: 1px solid #888;
+    .task-editor label {
+        display: block;
+        margin-top: 0.5rem;
+        font-weight: bold;
+    }
+
+    .task-editor input {
+        width: 100%;
+        padding: 0.3rem;
+        margin-top: 0.2rem;
+        box-sizing: border-box;
+    }
+
+.editor-buttons {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 1rem;
+}
+.color-swatches {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0.3rem;
+    margin-top: 0.4rem;
+}
+
+.swatch {
+    width: 24px;
+    height: 24px;
+    border: 1px solid #aaa;
     border-radius: 4px;
     cursor: pointer;
-    padding: 0;
 }
 
-    .color-option.selected {
+    .swatch.selected {
         outline: 2px solid #333;
-        box-shadow: 0 0 2px #000;
+        box-shadow: 0 0 3px #000;
     }
 
 
@@ -200,21 +227,22 @@ ul.task-tree {
 }
 
 .done-future {
-    background: #f1cab7cc;
+    background: #8448;
 }
 
 
 .pending {
-    background: #ccfdc9cc;
+    background: #888c;
+    color: #94f88e;
 }
 
 .overdue {
-    background: #fa868688;
-    color: darkred;
+    background: #844c;
+    color: #f88;
 }
 
-.outdate {
-    background: #88888888;
+.normal {
+    background: #888c;
 }
 
 /* 提示儲存完成 */

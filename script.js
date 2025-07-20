@@ -172,11 +172,6 @@ function flattenTasks(data, parentPath = [], visible = true) {
         if (task.children?.length) {
             list.push(...flattenTasks(task.children, path, showChildren));
         }
-
-        // 如果是該層級最後一個任務，插入 spacer
-        if (index === data.length - 1 && visible) {
-            list.push({ isSpacer: true });
-        }
     });
     return list;
 }
@@ -194,16 +189,124 @@ function getTaskByPath(path) {
         task: ref[path[path.length - 1]]
     };
 }
+function findTaskPath(target, data = tasks, path = []) {
+    for (let i = 0; i < data.length; i++) {
+        const t = data[i];
+        const currentPath = [...path, i];
+        if (t === target) return currentPath;
+
+        if (Array.isArray(t.children)) {
+            const childPath = findTaskPath(target, t.children, currentPath);
+            if (childPath) return childPath;
+        }
+    }
+    return null; // 沒找到
+}
+function openTaskEditor(task, parentArray = null) {
+    document.querySelector("#task-editor")?.remove();
+
+    const editor = document.createElement("div");
+    editor.id = "task-editor";
+    editor.className = "task-editor";
+    editor.innerHTML = `
+    <label>任務名稱：</label>
+    <input type="text" id="edit-title" value="${task.title || ""}">
+
+    <label>週期（天）：</label>
+    <input type="number" id="edit-interval" value="${task.intervalDays || 7}">
+
+    <label>底色：</label>
+    <div class="color-swatches">
+      ${colors.map(c => `
+        <button class="swatch ${task.bgColor === c ? 'selected' : ''}"
+                style="background:${c || 'transparent'}"
+                data-color="${c}" title="${c || '無'}"></button>
+      `).join("")}
+    </div>
+
+    <div class="editor-buttons">
+      <button id="save-task">儲存</button>
+      <button id="cancel-task">取消</button>
+      ${!parentArray ? `<button id="delete-task">刪除任務</button>` : ""}
+    </div>
+  `;
+    document.body.appendChild(editor);
+
+    // 選色行為
+    editor.querySelectorAll(".swatch").forEach(btn => {
+        btn.onclick = () => {
+            editor.querySelectorAll(".swatch").forEach(b => b.classList.remove("selected"));
+            btn.classList.add("selected");
+            task.bgColor = btn.dataset.color || null;
+        };
+    });
+
+    // 儲存
+    editor.querySelector("#save-task").onclick = () => {
+        task.title = editor.querySelector("#edit-title").value.trim() || "（未命名）";
+        task.intervalDays = +editor.querySelector("#edit-interval").value || 7;
+
+        // 如果是新增任務（有 parentArray），就加入資料陣列
+        if (parentArray) parentArray.push(task);
+
+        saveFile();
+        refreshAll();
+        editor.remove();
+    };
+
+    editor.querySelector("#cancel-task").onclick = () => editor.remove();
+
+    // 刪除（僅編輯時提供）
+    if (!parentArray) {
+        editor.querySelector("#delete-task").onclick = () => {
+            if (confirm("確定要刪除這個任務？")) {
+                const path = findTaskPath(task);
+                const { parent, index } = getTaskByPath(path);
+                parent.splice(index, 1);
+                saveFile();
+                refreshAll();
+                editor.remove();
+            }
+        };
+    }
+}
+function newTask() {
+    return {
+        id: Date.now().toString(),
+        title: "",
+        intervalDays: 0,
+        lastCompleted: farFuture,
+        completionDates: [],
+        collapsed: true,
+        children: []
+    };
+}
 
 function refreshAll() {
     today = parseDate(new Date());
-    treeRoot.innerHTML = "";
-    renderTree(tasks, treeRoot);
+    renderTreeRoot();
     renderCalendar();
 }
 
 
 // 4a. Render task tree
+function renderTreeRoot() {
+    treeRoot.innerHTML = "";
+
+    renderTree(tasks, treeRoot);
+
+    const rootAddBtn = document.createElement("button");
+    rootAddBtn.className = "add-root-task-btn";
+    rootAddBtn.textContent = "➕ 新增任務";
+    rootAddBtn.onclick = () => {
+        const t = newTask();
+        openTaskEditor(t, tasks);
+
+        saveFile();
+        refreshAll();
+    };
+    treeRoot.appendChild(rootAddBtn);
+}
 function renderTree(data, parentEl, path = []) {
     const ul = document.createElement("ul");
     ul.className = "task-tree";
@@ -239,9 +342,7 @@ function renderTree(data, parentEl, path = []) {
         const ctr = document.createElement("span");
         ctr.className = "controls";
         ctr.innerHTML = `
-      <button class="color-trigger" title="設定底色" style="background:${task.bgColor || "transparent"}">🎨</button>
-      <button class="edit-btn" title="編輯名稱與週期">✏️</button>
-      <button class="delete-btn" title="刪除">❌</button>
+      <button class="edit-btn" title="編輯任務">🛠️</button>
       <button class="add-child-btn" title="新增子任務">➕</button>`;
 
         line.append(toggleBtn, titleSpan, ctr);
@@ -256,7 +357,6 @@ function renderTree(data, parentEl, path = []) {
         new Sortable(ul, {
             animation: 150,
             handle: ".task-title", // 或其他控制區域
-            filter: ".add-row", // 排除 .add-row
             onEnd(evt) {
                 const li = evt.item.closest(".task-node");
                 const parentPath = li.dataset.path.split(",").map(n => +n);
@@ -271,46 +371,7 @@ function renderTree(data, parentEl, path = []) {
         });
     });
 
-    const addLi = document.createElement("li");
-    addLi.className = "add-row";
-    addLi.dataset.path = path.join(",");
-    const addBtn = document.createElement("button");
-    addBtn.className = "add-sibling-tail-btn";
-    addBtn.textContent = "➕";
-    addBtn.title = "新增同級任務";
-    addLi.appendChild(addBtn);
-    ul.appendChild(addLi);
-
     parentEl.appendChild(ul);
-}
-function showColorPicker(triggerBtn, task) {
-    const existing = document.getElementById("color-popup");
-    if (existing) existing.remove(); // 清除其他視窗
-
-    const popup = document.createElement("div");
-    popup.id = "color-popup";
-    popup.className = "color-popup";
-    colors.forEach(c => {
-        const btn = document.createElement("button");
-        btn.className = "color-option";
-        btn.style.background = c || "transparent";
-        if (task.bgColor === c) btn.classList.add("selected");
-        btn.title = c || "無底色";
-        btn.onclick = () => {
-            task.bgColor = c || null;
-            popup.remove();
-            saveFile();
-            refreshAll();
-        };
-        popup.appendChild(btn);
-    });
-
-    document.body.appendChild(popup);
-
-    // 對齊按鈕位置（絕對定位）
-    const rect = triggerBtn.getBoundingClientRect();
-    popup.style.top = `${rect.bottom + window.scrollY}px`;
-    popup.style.left = `${rect.left + window.scrollX}px`;
 }
 
 // 4b. Render calendar grid
@@ -331,15 +392,6 @@ function renderCalendar() {
         const tr = document.createElement("tr");
         tr.style.background = task.bgColor || "transparent";
 
-        if (task.isSpacer) {
-            const spacerTd = document.createElement("td");
-            spacerTd.className = "spacer-row";
-            spacerTd.colSpan = dates.length;
-            tr.appendChild(spacerTd);
-            calBody.appendChild(tr);
-            return;
-        }
-
         const lastDate = parseDate(task.lastCompleted);
         dates.forEach(d => {
             const ds = formatDate(d);
@@ -353,7 +405,7 @@ function renderCalendar() {
                     td.className = "done-future"; td.textContent = "🕒";
                 }
             } else if (current <= lastDate) {
-                td.className = "outdate"; td.textContent = "-";
+                td.className = "normal"; td.textContent = ".";
             } else {
                 const diff = diffDays(task, ds);
                 if (diff >= 0) {
@@ -370,8 +422,6 @@ function renderCalendar() {
         calBody.appendChild(tr);
     });
 }
-
-// helper: generate date range
 function generateDates(before = 15, after = 15) {
     const arr = [];
     for (let i = -before; i <= after; i++) {
@@ -383,10 +433,7 @@ function generateDates(before = 15, after = 15) {
 }
 
 // 5. Event delegation & init
-document.addEventListener("DOMContentLoaded", () => {
-    checkFileSystemSupport();
-    //refreshAll();
-});
+document.addEventListener("DOMContentLoaded", checkFileSystemSupport);
 
 treeRoot.addEventListener("click", e => {
     const btn = e.target.closest("button");
@@ -397,58 +444,17 @@ treeRoot.addEventListener("click", e => {
         .split(",").filter(s => s).map(n => +n);
     let ref = tasks;
     path.forEach(i => ref = ref[i].children);
+    const { task, parent, index } = getTaskByPath(path);
 
     // add child
     if (btn.matches(".add-child-btn")) {
-        const { task } = getTaskByPath(path);
-        const t = prompt("子任務名稱？");
-        if (t) {
-            task.children ||= [];
-            task.children.push({
-                id: Date.now().toString(),
-                title: t.trim(),
-                intervalDays: 7,
-                lastCompleted: farFuture,
-                completionDates: [],
-                collapsed: false,
-                children: []
-            });
-        }
+        const t = newTask();
+        openTaskEditor(t, task.children);
     }
 
     // edit
     if (btn.matches(".edit-btn")) {
-        const { task } = getTaskByPath(path);
-        const n = prompt("修改名稱？", task.title);
-        if (n) task.title = n.trim();
-        const v = prompt("修改週期？", task.intervalDays);
-        const iv = +v; if (!isNaN(iv) && iv > 0) task.intervalDays = iv;
-    }
-
-    // delete
-    if (btn.matches(".delete-btn")) {
-        const { parent, index } = getTaskByPath(path);
-        if (confirm("刪除？")) parent.splice(index, 1);
-    }
-
-    // color trigger
-    if (btn.matches(".color-trigger")) {
-        const { task } = getTaskByPath(path);
-        showColorPicker(btn, task);
-    }
-
-    // add sibling
-    if (btn.matches(".add-sibling-tail-btn")) {
-        const t = prompt("任務名稱？");
-        if (t) ref.push({
-            id: Date.now().toString(),
-            title: t.trim(),
-            intervalDays: 7,
-            lastCompleted: farFuture,
-            completionDates: [],
-            collapsed: false,
-            children: []
-        });
+        openTaskEditor(task);
     }
 
     saveFile();
