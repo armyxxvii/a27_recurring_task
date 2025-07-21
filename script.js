@@ -113,7 +113,7 @@ function showToast(msg = "已儲存") {
     setTimeout(() => toast.classList.remove("show"), 2000);
 }
 
-// 3. Date utils & flatten tasks
+// 3a. Date
 function formatDate(d) {
     const yy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -150,11 +150,34 @@ function diffDays(task, d) {
     const last = parseDate(task.lastCompleted);
     const next = new Date(last);
     next.setDate(last.getDate() + task.intervalDays);
-
-    const current = parseDate(d);
-    return Math.ceil((next - current) / dayMS);
+    return Math.ceil((next - parseDate(d)) / dayMS);
 }
+function generateDates(before = 15, after = 15) {
+    const arr = [];
+    const base = today.getTime();
+    for (let i = -before; i <= after; i++) {
+        arr.push(new Date(base + i * dayMS));
+    }
+    return arr;
+}
+function updateLastCompleted(taskList) {
+    const now = today.getTime();
 
+    taskList.forEach(task => {
+        const past = (task.completionDates || [])
+            .map(ds => parseDate(ds).getTime())
+            .filter(t => t <= now);
+
+        task.lastCompleted = past.length
+            ? formatDate(new Date(Math.max(...past)))
+            : farFuture;
+
+        if (task.children?.length) {
+            updateLastCompleted(task.children);
+        }
+    });
+}
+// 3b. Tasks
 function buildIdMap(list) {
     idMap.clear();
     const stack = [...list];
@@ -184,7 +207,6 @@ function flattenTasks(data, parentPath = [], visible = true) {
     });
     return list;
 }
-
 function getTaskByPath(path) {
     let ref = tasks;
     // path: [0,2,1] 代表 tasks[0].children[2].children[1]
@@ -288,8 +310,10 @@ function newTask() {
         children: []
     };
 }
+// 3c. Initialize
 function refreshAll() {
     today = parseDate(new Date());
+    updateLastCompleted(tasks);
     buildIdMap(tasks);
     renderTreeRoot();
     renderCalendar();
@@ -434,14 +458,6 @@ function renderCalendar() {
     });
 
     calBody.appendChild(bodyFrag);
-}
-function generateDates(before = 15, after = 15) {
-    const arr = [];
-    const base = today.getTime();
-    for (let i = -before; i <= after; i++) {
-        arr.push(new Date(base + i * dayMS));
-    }
-    return arr;
 }
 
 // 5. Event delegation & init
