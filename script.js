@@ -6,6 +6,7 @@ const calBody = document.getElementById("calendar-body");
 const toast = document.getElementById("save-toast");
 
 const farFuture = "2700-02-27";
+const dayMS = 1000 * 60 * 60 * 24;
 const colors = [
     "",           // 無底色
     "#f44336",    // 鮮紅（Red）
@@ -18,6 +19,7 @@ const colors = [
     "#9c27b0",    // 紫色（Purple）
     "#795548",    // 棕色（Brown）
 ];
+const idMap = new Map();
 
 let tasks = [];
 let fileHandle = null;
@@ -70,6 +72,7 @@ async function inputFile(event) {
 async function loadFile(file) {
     const text = await file.text();
     tasks = text.trim() ? JSON.parse(text) : [];
+    buildIdMap(tasks);
     refreshAll();
     showToast("已載入任務");
 }
@@ -149,7 +152,20 @@ function diffDays(task, d) {
     next.setDate(last.getDate() + task.intervalDays);
 
     const current = parseDate(d);
-    return Math.ceil((next - current) / (1000 * 60 * 60 * 24));
+    return Math.ceil((next - current) / dayMS);
+}
+
+function buildIdMap(list) {
+    idMap.clear();
+    const stack = [...list];
+
+    while (stack.length) {
+        const task = stack.pop();
+        idMap.set(task.id, task);
+        if (task.children?.length) {
+            stack.push(...task.children);
+        }
+    }
 }
 function flattenTasks(data, parentPath = [], visible = true) {
     const list = [];
@@ -236,9 +252,8 @@ function openTaskEditor(task, parentArray = null) {
     // 儲存
     editor.querySelector("#save-task").onclick = () => {
         task.title = editor.querySelector("#edit-title").value.trim() || "（未命名）";
-        task.intervalDays = +editor.querySelector("#edit-interval").value || 7;
+        task.intervalDays = +editor.querySelector("#edit-interval").value || 0;
 
-        // 如果是新增任務（有 parentArray），就加入資料陣列
         if (parentArray) parentArray.push(task);
 
         saveFile();
@@ -275,6 +290,7 @@ function newTask() {
 }
 function refreshAll() {
     today = parseDate(new Date());
+    buildIdMap(tasks);
     renderTreeRoot();
     renderCalendar();
 }
@@ -401,7 +417,7 @@ function renderCalendar() {
                 status = "normal";
                 text = ".";
             } else {
-                const diff = Math.ceil((lastTime + task.intervalDays * 86400000 - currTime) / 86400000);
+                const diff = Math.ceil((lastTime + task.intervalDays * dayMS - currTime) / dayMS);
                 status = diff >= 0 ? "pending" : "overdue";
                 text = String(Math.abs(diff));
             }
@@ -423,7 +439,7 @@ function generateDates(before = 15, after = 15) {
     const arr = [];
     const base = today.getTime();
     for (let i = -before; i <= after; i++) {
-        arr.push(new Date(base + i * 86400000));
+        arr.push(new Date(base + i * dayMS));
     }
     return arr;
 }
@@ -462,18 +478,7 @@ calTable.addEventListener("click", async e => {
 
     const { id, date } = td.dataset;
 
-    // 遞迴尋找原始任務物件
-    let found = null;
-    function findById(list) {
-        for (const task of list) {
-            if (task.id === id) {
-                found = task;
-                return;
-            }
-            if (task.children?.length) findById(task.children);
-        }
-    }
-    findById(tasks);
+    const found = idMap.get(id);
     if (!found) return;
 
     // 切換完成狀態
