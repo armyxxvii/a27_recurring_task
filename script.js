@@ -1,10 +1,10 @@
 ﻿// 1. DOM nodes & global state
-const openBtn = document.getElementById("open-file-btn");
 const treeRoot = document.getElementById("task-tree-root");
 const calTable = document.getElementById("calendar-table");
 const dateHead = document.getElementById("date-header");
 const calBody = document.getElementById("calendar-body");
 const toast = document.getElementById("save-toast");
+
 const farFuture = "2700-02-27";
 const colors = [
     "",           // 無底色
@@ -22,15 +22,15 @@ const colors = [
 let tasks = [];
 let fileHandle = null;
 let currentFilename = "tasks.json";
+let downloadBtn = null;
 let today;
 
 // 2. File I/O: open, save & toast
 function checkFileSystemSupport() {
-    const supported = !!window.showOpenFilePicker;
     const controls = document.getElementById("controls");
     controls.innerHTML = "";
 
-    if (supported) {
+    if (window.showOpenFilePicker) {
         const openBtn = document.createElement("button");
         openBtn.textContent = "開啟任務 JSON";
         openBtn.onclick = openFile;
@@ -42,10 +42,11 @@ function checkFileSystemSupport() {
         input.onchange = inputFile;
         controls.appendChild(input);
 
-        const saveBtn = document.createElement("button");
-        saveBtn.textContent = "下載任務檔";
-        saveBtn.onclick = downloadFile;
-        controls.appendChild(saveBtn);
+        downloadBtn = document.createElement("button");
+        downloadBtn.textContent = "下載任務檔";
+        downloadBtn.onclick = downloadFile;
+        downloadBtn.disabled = true;
+        controls.appendChild(downloadBtn);
     }
 }
 
@@ -59,11 +60,14 @@ async function openFile() {
 
 async function inputFile(event) {
     const file = event.target.files[0];
-    if (file) await loadFile(file);
+    if (file) {
+        currentFilename = file.name;
+        await loadFile(file);
+        if (downloadBtn) downloadBtn.disabled = false;
+    }
 }
 
 async function loadFile(file) {
-    currentFilename = file.name;
     const text = await file.text();
     tasks = text.trim() ? JSON.parse(text) : [];
     refreshAll();
@@ -84,13 +88,14 @@ async function saveFile() {
 async function downloadFile() {
     sortDates();
 
-    const json = JSON.stringify(tasks, null, 2);
-    const blob = new Blob([json], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(tasks, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
 
     const a = document.createElement("a");
     a.href = url;
-    a.download = currentFilename || "tasks.json";
+    a.download = currentFilename.endsWith(".json")
+        ? currentFilename
+        : `${currentFilename}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -112,13 +117,6 @@ function formatDate(d) {
     const dd = String(d.getDate()).padStart(2, '0');
     return `${yy}-${mm}-${dd}`;
 }
-
-/**
- * parseDate
- *  - 如果传进来的是 Date，就归零时分秒
- *  - 如果是字串 "YYYY-MM-DD"，拆分后用本地时区建构
- *  - 其它类型，则让 Date 构造器去处理
- */
 function parseDate(input) {
     if (input instanceof Date) {
         return new Date(input.getFullYear(), input.getMonth(), input.getDate());
@@ -129,7 +127,6 @@ function parseDate(input) {
     }
     return new Date(input);
 }
-
 function sortDates() {
     function recurSort(list) {
         list.forEach(task => {
@@ -143,15 +140,10 @@ function sortDates() {
     }
     recurSort(tasks);
 }
-
 function isToday(d) {
-    return d.getFullYear() === today.getFullYear()
-        && d.getMonth() === today.getMonth()
-        && d.getDate() === today.getDate();
+    return formatDate(d) === formatDate(today);
 }
-
 function diffDays(task, d) {
-    // 用 parseDate 取出正确的本地日期
     const last = parseDate(task.lastCompleted);
     const next = new Date(last);
     next.setDate(last.getDate() + task.intervalDays);
@@ -159,15 +151,14 @@ function diffDays(task, d) {
     const current = parseDate(d);
     return Math.ceil((next - current) / (1000 * 60 * 60 * 24));
 }
-
 function flattenTasks(data, parentPath = [], visible = true) {
     const list = [];
 
-    data.forEach((task, index) => {
+    data.forEach(task => {
         const path = [...parentPath, task.title];
 
         if (visible) {
-            list.push({ ...task, fullTitle: path.join(" / "), isSpacer: false });
+            list.push({ ...task, fullTitle: path.join(" / ") });
         }
 
         const showChildren = !task.collapsed;
@@ -178,7 +169,6 @@ function flattenTasks(data, parentPath = [], visible = true) {
     return list;
 }
 
-// 根據 path 陣列找到對應的任務以及父陣列
 function getTaskByPath(path) {
     let ref = tasks;
     // path: [0,2,1] 代表 tasks[0].children[2].children[1]
@@ -283,13 +273,11 @@ function newTask() {
         children: []
     };
 }
-
 function refreshAll() {
     today = parseDate(new Date());
     renderTreeRoot();
     renderCalendar();
 }
-
 
 // 4a. Render task tree
 function renderTreeRoot() {
@@ -323,18 +311,12 @@ function renderTree(data, parentEl, path = []) {
 
         const toggleBtn = document.createElement("button");
         toggleBtn.className = "toggle-btn";
-        toggleBtn.innerHTML = `<span>${task.collapsed ? "⯈" : "⯆"}</span>`;
+        toggleBtn.innerHTML = `${task.collapsed ? "⯈" : "⯆"}`;
 
         const hasChildren = Array.isArray(task.children) && task.children.length > 0;
         if (!hasChildren) {
             toggleBtn.disabled = true;
             task.collapsed = true;
-        } else {
-            toggleBtn.onclick = () => {
-                task.collapsed = !task.collapsed;
-                saveFile();
-                refreshAll();
-            };
         }
 
         const titleSpan = document.createElement("span");
@@ -355,22 +337,22 @@ function renderTree(data, parentEl, path = []) {
         }
 
         ul.appendChild(li);
+    });
 
-        new Sortable(ul, {
-            animation: 150,
-            handle: ".task-title", // 或其他控制區域
-            onEnd(evt) {
-                const li = evt.item.closest(".task-node");
-                const parentPath = li.dataset.path.split(",").map(n => +n);
-                const { parent } = getTaskByPath([...parentPath]);
+    new Sortable(ul, {
+        animation: 150,
+        handle: ".task-title",
+        onEnd(evt) {
+            const li = evt.item.closest(".task-node");
+            const parentPath = li.dataset.path.split(",").map(n => +n);
+            const { parent } = getTaskByPath(parentPath);
 
-                const moved = parent.splice(evt.oldIndex, 1)[0];
-                parent.splice(evt.newIndex, 0, moved);
+            const moved = parent.splice(evt.oldIndex, 1)[0];
+            parent.splice(evt.newIndex, 0, moved);
 
-                saveFile();
-                refreshAll();
-            }
-        });
+            saveFile();
+            refreshAll();
+        }
     });
 
     parentEl.appendChild(ul);
@@ -379,57 +361,69 @@ function renderTree(data, parentEl, path = []) {
 // 4b. Render calendar grid
 function renderCalendar() {
     const dates = generateDates();
-    // header
+    const dateStrings = dates.map(d => formatDate(d));
+    const labels = dateStrings.map(s => s.slice(5));
+    const todayStr = formatDate(today);
+
+    // Header 批次建立
     dateHead.innerHTML = "";
-    dates.forEach(d => {
+    const headFrag = document.createDocumentFragment();
+    labels.forEach((label, i) => {
         const th = document.createElement("th");
-        th.textContent = formatDate(d).slice(5);
-        if (isToday(d)) th.classList.add("today");
-        dateHead.appendChild(th);
+        th.textContent = label;
+        if (dateStrings[i] === todayStr) th.classList.add("today");
+        headFrag.appendChild(th);
     });
+    dateHead.appendChild(headFrag);
 
-    // body
+    // Body 批次建立
     calBody.innerHTML = "";
+    const bodyFrag = document.createDocumentFragment();
+
     flattenTasks(tasks).forEach(task => {
-        const tr = document.createElement("tr");
-        tr.style.background = task.bgColor || "transparent";
+        const row = document.createElement("tr");
+        row.style.background = task.bgColor || "transparent";
 
-        const lastDate = parseDate(task.lastCompleted);
-        dates.forEach(d => {
-            const ds = formatDate(d);
-            const current = parseDate(ds);
+        const compSet = new Set(task.completionDates || []);
+        const lastTime = parseDate(task.lastCompleted).getTime();
+
+        dates.forEach((d, idx) => {
+            const ds = dateStrings[idx];
             const td = document.createElement("td");
+            const currTime = d.getTime();
 
-            if (task.completionDates?.includes(ds)) {
-                if (d <= today) {
-                    td.className = "done-past"; td.textContent = "✔︎";
-                } else {
-                    td.className = "done-future"; td.textContent = "🕒";
-                }
-            } else if (current <= lastDate) {
-                td.className = "normal"; td.textContent = ".";
+            let status;
+            let text;
+            if (compSet.has(ds)) {
+                status = currTime <= today.getTime() ? "done-past" : "done-future";
+                text = currTime <= today.getTime() ? "✔︎" : "🕒";
+            } else if (currTime <= lastTime) {
+                status = "normal";
+                text = ".";
             } else {
-                const diff = diffDays(task, ds);
-                if (diff >= 0) {
-                    td.className = "pending"; td.textContent = diff;
-                } else {
-                    td.className = "overdue"; td.textContent = -diff;
-                }
+                const diff = Math.ceil((lastTime + task.intervalDays * 86400000 - currTime) / 86400000);
+                status = diff >= 0 ? "pending" : "overdue";
+                text = String(Math.abs(diff));
             }
 
+            td.classList.add(status);
+            td.textContent = text;
             td.dataset.id = task.id;
             td.dataset.date = ds;
-            tr.appendChild(td);
+
+            row.appendChild(td);
         });
-        calBody.appendChild(tr);
+
+        bodyFrag.appendChild(row);
     });
+
+    calBody.appendChild(bodyFrag);
 }
 function generateDates(before = 15, after = 15) {
     const arr = [];
+    const base = today.getTime();
     for (let i = -before; i <= after; i++) {
-        const d = parseDate(today);
-        d.setDate(today.getDate() + i);
-        arr.push(d);
+        arr.push(new Date(base + i * 86400000));
     }
     return arr;
 }
@@ -438,29 +432,28 @@ function generateDates(before = 15, after = 15) {
 document.addEventListener("DOMContentLoaded", checkFileSystemSupport);
 
 treeRoot.addEventListener("click", e => {
-    const btn = e.target.closest("button");
-    const li = btn?.closest(".task-node, .add-row");
-    if (!btn || !li) return;
+    const li = e.target.closest(".task-node");
+    if (!li) return;
 
-    const path = (li.dataset.path || "")
-        .split(",").filter(s => s).map(n => +n);
-    let ref = tasks;
-    path.forEach(i => ref = ref[i].children);
-    const { task, parent, index } = getTaskByPath(path);
+    const path = li.dataset.path.split(",").map(Number);
+    const { task } = getTaskByPath(path);
+    let modified = false;
 
-    // add child
-    if (btn.matches(".add-child-btn")) {
-        const t = newTask();
-        openTaskEditor(t, task.children);
+    if (e.target.matches(".toggle-btn")) {
+        task.collapsed = !task.collapsed;
+        modified = true;
     }
-
-    // edit
-    if (btn.matches(".edit-btn")) {
+    else if (e.target.matches(".add-child-btn")) {
+        openTaskEditor(newTask(), task.children);
+    }
+    else if (e.target.matches(".edit-btn")) {
         openTaskEditor(task);
     }
 
-    saveFile();
-    refreshAll();
+    if (modified) {
+        saveFile();
+        refreshAll();
+    }
 });
 
 calTable.addEventListener("click", async e => {
@@ -483,7 +476,7 @@ calTable.addEventListener("click", async e => {
     findById(tasks);
     if (!found) return;
 
-    // ✔︎ 切換完成狀態
+    // 切換完成狀態
     const i = found.completionDates.indexOf(date);
     if (i >= 0) {
         found.completionDates.splice(i, 1);
@@ -504,10 +497,10 @@ calTable.addEventListener("click", async e => {
             const latest = valid.sort((a, b) => b - a)[0];
             found.lastCompleted = formatDate(latest);
         } else {
-            found.lastCompleted = farFuture; // 沒有有效的完成記錄，重置為遠未來
+            found.lastCompleted = farFuture;
         }
     } else {
-        found.lastCompleted = farFuture; // 沒有記錄，重置為遠未來
+        found.lastCompleted = farFuture;
     }
 
     await saveFile();

@@ -43,7 +43,7 @@ body {
         font-size: 0.9rem;
         padding: 0.3rem 0.6rem;
         border: none;
-        background: #e7e7e7;
+        background: #e0e0ff;
         cursor: pointer;
         border-radius: 4px;
     }
@@ -76,6 +76,7 @@ ul.task-tree {
 
 .task-line {
     height: 25px;
+    line-height: 16px;
     display: flex;
     align-items: center;
     gap: 0rem;
@@ -104,8 +105,8 @@ ul.task-tree {
 .controls button {
     font-size: 0.6rem;
     padding: 0.1rem;
-    border: 1px #e7e7e7;
-    background: #e7e7e7;
+    border: 1px #e0e0ff;
+    background: #e0e0ff;
     cursor: pointer;
 }
 
@@ -115,13 +116,8 @@ ul.task-tree {
 
 
 /* 底部新增按鈕 */
-.add-row {
-    height: 25px;
-    align-content: center;
-}
-
 .add-root-task-btn {
-    height: 20px;
+    height: 25px;
     width: 100%;
     padding: 0;
     background: #e0e0ff;
@@ -152,19 +148,13 @@ ul.task-tree {
         white-space: nowrap;
         min-width: 45px;
         height: 25px;
+        line-height: 16px;
         vertical-align: middle;
     }
 
     #calendar-table thead th.today {
         background: #fa8686;
         color: white;
-    }
-
-    #calendar-table td.spacer-row {
-        height: 25px;
-        background: transparent;
-        border: none;
-        pointer-events: none;
     }
 
 
@@ -200,6 +190,7 @@ ul.task-tree {
     justify-content: space-between;
     margin-top: 1rem;
 }
+
 .color-swatches {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
