@@ -114,7 +114,6 @@ ul.task-tree {
         background: #d0d0ff;
     }
 
-
 /* 底部新增按鈕 */
 .add-root-task-btn {
     height: 25px;
@@ -142,7 +141,8 @@ ul.task-tree {
     font-size: 0.85rem;
 }
 
-    #calendar-table th, #calendar-table td {
+    #calendar-table th,
+    #calendar-table td {
         border: 1px solid #ddd;
         text-align: center;
         white-space: nowrap;
@@ -152,10 +152,60 @@ ul.task-tree {
         vertical-align: middle;
     }
 
-    #calendar-table thead th.today {
-        background: #fa8686;
-        color: white;
-    }
+        #calendar-table th.today {
+            border: 3px #080 solid;
+            background: #080d;
+        }
+
+        #calendar-table td.today {
+            border: 3px #080 solid;
+        }
+
+        #calendar-table th.holiday {
+            border: none;
+            background: #a007;
+            color: #fff;
+        }
+
+        #calendar-table td.holiday {
+            border: none;
+            background: #a007;
+        }
+
+        #calendar-table th.today.holiday {
+            border: 3px #a00 solid;
+            background: #a00d;
+            color: #fff;
+        }
+
+        #calendar-table td.today.holiday {
+            border: 3px #a00 solid;
+            background: #a007;
+        }
+
+/* 狀態格顏色 */
+tbody .done-past {
+    background: #94f88e;
+}
+
+tbody .done-future {
+    background: #0008;
+}
+
+
+tbody .pending {
+    background: #888c;
+    color: #94f88e;
+}
+
+tbody .overdue {
+    background: #000b;
+    color: #f88;
+}
+
+tbody .normal {
+    background: #888c;
+}
 
 
 .task-editor {
@@ -211,32 +261,6 @@ ul.task-tree {
         box-shadow: 0 0 3px #000;
     }
 
-
-/* 狀態格顏色 */
-.done-past {
-    background: #94f88e;
-}
-
-.done-future {
-    background: #8448;
-}
-
-
-.pending {
-    background: #888c;
-    color: #94f88e;
-}
-
-.overdue {
-    background: #844c;
-    color: #f88;
-}
-
-.normal {
-    background: #888c;
-}
-
-/* 提示儲存完成 */
 #save-toast {
     position: fixed;
     bottom: 1rem;

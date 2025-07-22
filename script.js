@@ -5,6 +5,7 @@ const dateHead = document.getElementById("date-header");
 const calBody = document.getElementById("calendar-body");
 const toast = document.getElementById("save-toast");
 
+const holidayDates = new Set();
 const farFuture = "2700-02-27";
 const dayMS = 1000 * 60 * 60 * 24;
 const colors = [
@@ -71,29 +72,49 @@ async function inputFile(event) {
 
 async function loadFile(file) {
     const text = await file.text();
-    tasks = text.trim() ? JSON.parse(text) : [];
-    buildIdMap(tasks);
+    let data = JSON.parse(text || "[]");
+
+    if (Array.isArray(data)) {
+        tasks = data;
+        holidayDates.clear();
+    } else {
+        tasks = Array.isArray(data.tasks) ? data.tasks : [];
+        holidayDates.clear();
+        (data.holidays || []).forEach(d => holidayDates.add(d));
+    }
+
+    currentFilename = file.name || currentFilename;
     refreshAll();
-    showToast("已載入任務");
+    showToast("已載入");
 }
 
 async function saveFile() {
     if (!fileHandle) return;
+    sortDates(); updateLastCompleted(tasks);
 
-    sortDates();
+    const payload = {
+        tasks,
+        holidays: Array.from(holidayDates)
+    };
 
     const w = await fileHandle.createWritable();
-    await w.write(JSON.stringify(tasks, null, 2));
+    await w.write(JSON.stringify(payload, null, 2));
     await w.close();
     showToast("已儲存");
 }
 
 async function downloadFile() {
     sortDates();
+    updateLastCompleted(tasks);
 
-    const blob = new Blob([JSON.stringify(tasks, null, 2)], { type: "application/json" });
+    const payload = {
+        tasks,
+        holidays: Array.from(holidayDates)
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+        type: "application/json"
+    });
     const url = URL.createObjectURL(blob);
-
     const a = document.createElement("a");
     a.href = url;
     a.download = currentFilename.endsWith(".json")
@@ -103,8 +124,7 @@ async function downloadFile() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-
-    showToast("已下載任務檔");
+    showToast("已下載");
 }
 
 function showToast(msg = "已儲存") {
@@ -401,60 +421,63 @@ function renderTree(data, parentEl, path = []) {
 // 4b. Render calendar grid
 function renderCalendar() {
     const dates = generateDates();
-    const dateStrings = dates.map(d => formatDate(d));
-    const labels = dateStrings.map(s => s.slice(5));
+    const dsArr = dates.map(formatDate);
     const todayStr = formatDate(today);
 
-    // Header 批次建立
+    // header
     dateHead.innerHTML = "";
     const headFrag = document.createDocumentFragment();
-    labels.forEach((label, i) => {
+    dsArr.forEach(ds => {
         const th = document.createElement("th");
-        th.textContent = label;
-        if (dateStrings[i] === todayStr) th.classList.add("today");
+        th.textContent = ds.slice(5);
+        th.dataset.date = ds;
+        th.title = "點擊設定 / 取消休假日";
+
+        if (holidayDates.has(ds)) th.classList.add("holiday");
+        if (ds === todayStr) th.classList.add("today");
+
         headFrag.appendChild(th);
     });
     dateHead.appendChild(headFrag);
 
-    // Body 批次建立
+    // body
     calBody.innerHTML = "";
     const bodyFrag = document.createDocumentFragment();
-
     flattenTasks(tasks).forEach(task => {
-        const row = document.createElement("tr");
-        row.style.background = task.bgColor || "transparent";
+        const tr = document.createElement("tr");
+        tr.style.background = task.bgColor || "transparent";
 
         const compSet = new Set(task.completionDates || []);
         const lastTime = parseDate(task.lastCompleted).getTime();
+        const todayTime = today.getTime();
 
-        dates.forEach((d, idx) => {
-            const ds = dateStrings[idx];
+        dsArr.forEach(ds => {
             const td = document.createElement("td");
-            const currTime = d.getTime();
+            const currT = parseDate(ds).getTime();
 
-            let status;
-            let text;
             if (compSet.has(ds)) {
-                status = currTime <= today.getTime() ? "done-past" : "done-future";
-                text = currTime <= today.getTime() ? "✔︎" : "🕒";
-            } else if (currTime <= lastTime) {
-                status = "normal";
-                text = ".";
-            } else {
-                const diff = Math.ceil((lastTime + task.intervalDays * dayMS - currTime) / dayMS);
-                status = diff >= 0 ? "pending" : "overdue";
-                text = String(Math.abs(diff));
+                td.classList.add(currT <= todayTime ? "done-past" : "done-future");
+                td.textContent = currT <= todayTime ? "✔︎" : "🕒";
+            }
+            else if (currT <= lastTime) {
+                td.classList.add("normal");
+                td.textContent = ".";
+            }
+            else {
+                const diff = diffDays(task, ds);
+                td.classList.add(diff >= 0 ? "pending" : "overdue");
+                td.textContent = String(Math.abs(diff));
             }
 
-            td.classList.add(status);
-            td.textContent = text;
+            if (holidayDates.has(ds)) td.classList.add("holiday");
+            if (ds === todayStr) td.classList.add("today");
+
             td.dataset.id = task.id;
             td.dataset.date = ds;
-
-            row.appendChild(td);
+            tr.appendChild(td);
         });
 
-        bodyFrag.appendChild(row);
+        bodyFrag.appendChild(tr);
     });
 
     calBody.appendChild(bodyFrag);
@@ -462,6 +485,20 @@ function renderCalendar() {
 
 // 5. Event delegation & init
 document.addEventListener("DOMContentLoaded", checkFileSystemSupport);
+
+dateHead.addEventListener("click", e => {
+    const th = e.target.closest("th[data-date]");
+    if (!th) return;
+
+    const ds = th?.dataset?.date;
+    if (!ds) return;
+
+    if (holidayDates.has(ds)) holidayDates.delete(ds);
+    else holidayDates.add(ds);
+
+    refreshAll();
+    saveFile();
+});
 
 treeRoot.addEventListener("click", e => {
     const li = e.target.closest(".task-node");
@@ -476,6 +513,9 @@ treeRoot.addEventListener("click", e => {
         modified = true;
     }
     else if (e.target.matches(".add-child-btn")) {
+        if (!Array.isArray(task.children)) {
+            task.children = [];
+        }
         openTaskEditor(newTask(), task.children);
     }
     else if (e.target.matches(".edit-btn")) {
