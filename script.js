@@ -9,16 +9,18 @@ const holidayDates = new Set();
 const farFuture = "2700-02-27";
 const dayMS = 1000 * 60 * 60 * 24;
 const colors = [
-    "",           // 無底色
-    "#f44336",    // 鮮紅（Red）
-    "#ff9800",    // 橘色（Orange）
-    "#ffeb3b",    // 黃色（Yellow）
-    "#4caf50",    // 綠色（Green）
-    "#00bcd4",    // 青色（Cyan）
-    "#2196f3",    // 藍色（Blue）
-    "#3f51b5",    // 靛色（Indigo）
-    "#9c27b0",    // 紫色（Purple）
-    "#795548",    // 棕色（Brown）
+    "",            // 無底色
+    "#b3b3ff",     // 靛紫／輕柔
+    "#b0c4de",     // 藍灰／輕柔
+    "#fff1a8",     // 沙黃／輕柔
+    "#e1bee7",     // 藕色／輕柔
+    "#ffe6cc",     // 橘茶／輕柔
+    "#bbbbbb",     // 中性灰
+    "#5c6bc0",     // 靛紫／溫和
+    "#607d8b",     // 藍灰／溫和
+    "#fdd835",     // 沙黃／溫和
+    "#ab47bc",     // 藕色／溫和
+    "#ffb74d",     // 橘茶／溫和
 ];
 const idMap = new Map();
 
@@ -27,6 +29,9 @@ let fileHandle = null;
 let currentFilename = "tasks.json";
 let downloadBtn = null;
 let today;
+let calendarStartDate = null;
+let calendarEndDate = null;
+
 
 // 2. File I/O: open, save & toast
 function checkFileSystemSupport() {
@@ -74,6 +79,13 @@ async function loadFile(file) {
     const text = await file.text();
     let data = JSON.parse(text || "[]");
 
+    if (data.calendarRange) {
+        calendarStartDate = data.calendarRange.start ? parseDate(data.calendarRange.start) : null;
+        document.getElementById("calendar-start").value = data.calendarRange.start;
+        calendarEndDate = data.calendarRange.end ? parseDate(data.calendarRange.end) : null;
+        document.getElementById("calendar-end").value = data.calendarRange.end;
+    }
+
     if (Array.isArray(data)) {
         tasks = data;
         holidayDates.clear();
@@ -94,7 +106,11 @@ async function saveFile() {
 
     const payload = {
         tasks,
-        holidays: Array.from(holidayDates)
+        holidays: Array.from(holidayDates),
+        calendarRange: {
+            start: calendarStartDate ? formatDate(calendarStartDate) : null,
+            end: calendarEndDate ? formatDate(calendarEndDate) : null
+        }
     };
 
     const w = await fileHandle.createWritable();
@@ -172,13 +188,19 @@ function diffDays(task, d) {
     next.setDate(last.getDate() + task.intervalDays);
     return Math.ceil((next - parseDate(d)) / dayMS);
 }
-function generateDates(before = 15, after = 15) {
-    const arr = [];
-    const base = today.getTime();
-    for (let i = -before; i <= after; i++) {
-        arr.push(new Date(base + i * dayMS));
+function generateDates() {
+    const result = [];
+
+    const start = calendarStartDate || today;
+    const end = calendarEndDate || new Date(start.getTime() + 14 * 86400000);
+
+    let cursor = new Date(start);
+    while (cursor <= end) {
+        result.push(new Date(cursor));
+        cursor.setDate(cursor.getDate() + 1);
     }
-    return arr;
+
+    return result;
 }
 function updateLastCompleted(taskList) {
     const now = today.getTime();
@@ -197,6 +219,17 @@ function updateLastCompleted(taskList) {
         }
     });
 }
+function updateDateRange() {
+    const startInput = document.getElementById("calendar-start").value;
+    const endInput = document.getElementById("calendar-end").value;
+
+    calendarStartDate = startInput ? parseDate(startInput) : null;
+    calendarEndDate = endInput ? parseDate(endInput) : null;
+
+    refreshAll();
+    saveFile();
+}
+
 // 3b. Tasks
 function buildIdMap(list) {
     idMap.clear();
@@ -368,6 +401,7 @@ function renderTree(data, parentEl, path = []) {
 
         const line = document.createElement("div");
         line.className = "task-line";
+        line.style.background = task.bgColor || "transparent";
 
         const toggleBtn = document.createElement("button");
         toggleBtn.className = "toggle-btn";
@@ -381,7 +415,7 @@ function renderTree(data, parentEl, path = []) {
 
         const titleSpan = document.createElement("span");
         titleSpan.className = "task-title";
-        titleSpan.textContent = task.title;
+        titleSpan.textContent = `(${task.intervalDays}) ${task.title}`;
 
         const ctr = document.createElement("span");
         ctr.className = "controls";

@@ -14,6 +14,11 @@
         <div id="controls"></div>
     </header>
     <div class="container">
+        <label class="task-title">顯示範圍：</label>
+        <input type="date" id="calendar-start">～<input type="date" id="calendar-end">
+        <button onclick="updateDateRange()">套用</button>
+    </div>
+    <div class="container">
         <div class="scroll-sync">
             <!-- 左欄：任務樹 -->
             <div class="tree-column">
