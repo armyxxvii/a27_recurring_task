@@ -36,7 +36,7 @@ let calendarEndDate = null;
 // 2. File I/O: open, save & toast
 function checkFileSystemSupport() {
     const controls = document.getElementById("controls");
-    controls.innerHTML = "";
+    clearChildren(controls);
 
     if (window.showOpenFilePicker) {
         const openBtn = document.createElement("button");
@@ -57,7 +57,6 @@ function checkFileSystemSupport() {
         controls.appendChild(downloadBtn);
     }
 }
-
 async function openFile() {
     [fileHandle] = await window.showOpenFilePicker({
         types: [{ description: "JSON", accept: { "application/json": [".json"] } }]
@@ -65,7 +64,6 @@ async function openFile() {
     const file = await fileHandle.getFile();
     if (file) await loadFile(file);
 }
-
 async function inputFile(event) {
     const file = event.target.files[0];
     if (file) {
@@ -74,7 +72,6 @@ async function inputFile(event) {
         if (downloadBtn) downloadBtn.disabled = false;
     }
 }
-
 async function loadFile(file) {
     const text = await file.text();
     let data = JSON.parse(text || "[]");
@@ -99,7 +96,6 @@ async function loadFile(file) {
     refreshAll();
     showToast("已載入");
 }
-
 async function saveFile() {
     if (!fileHandle) return;
     sortDates(); updateLastCompleted(tasks);
@@ -116,9 +112,10 @@ async function saveFile() {
     const w = await fileHandle.createWritable();
     await w.write(JSON.stringify(payload, null, 2));
     await w.close();
+
+    refreshAll();
     showToast("已儲存");
 }
-
 async function downloadFile() {
     sortDates();
     updateLastCompleted(tasks);
@@ -141,12 +138,6 @@ async function downloadFile() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     showToast("已下載");
-}
-
-function showToast(msg = "已儲存") {
-    toast.textContent = msg;
-    toast.classList.add("show");
-    setTimeout(() => toast.classList.remove("show"), 2000);
 }
 
 // 3a. Date
@@ -226,7 +217,6 @@ function updateDateRange() {
     calendarStartDate = startInput ? parseDate(startInput) : null;
     calendarEndDate = endInput ? parseDate(endInput) : null;
 
-    refreshAll();
     saveFile();
 }
 
@@ -285,60 +275,81 @@ function findTaskPath(target, data = tasks, path = []) {
     }
     return null; // 沒找到
 }
+function newTask() {
+    return {
+        id: Date.now().toString(),
+        title: "",
+        intervalDays: 0,
+        bgColor: "",
+        lastCompleted: farFuture,
+        completionDates: [],
+        collapsed: true,
+        children: []
+    };
+}
+
+// 3c. Window
 function openTaskEditor(task, parentArray = null) {
     document.querySelector("#task-editor")?.remove();
 
     const editor = document.createElement("div");
     editor.id = "task-editor";
     editor.className = "task-editor";
-    editor.innerHTML = `
-    <label>任務名稱：</label>
-    <input type="text" id="edit-title" value="${task.title || ""}">
 
-    <label>週期（天）：</label>
-    <input type="number" id="edit-interval" value="${task.intervalDays || 7}">
+    // 任務名稱
+    const labelTitle = document.createElement("label");
+    labelTitle.textContent = "任務名稱：";
+    const inputTitle = document.createElement("input");
+    inputTitle.type = "text";
+    inputTitle.id = "edit-title";
+    inputTitle.value = task.title || "";
 
-    <label>底色：</label>
-    <div class="color-swatches">
-      ${colors.map(c => `
-        <button class="swatch ${task.bgColor === c ? 'selected' : ''}"
-                style="background:${c || 'transparent'}"
-                data-color="${c}" title="${c || '無'}"></button>
-      `).join("")}
-    </div>
+    // 週期
+    const labelInterval = document.createElement("label");
+    labelInterval.textContent = "週期（天）：";
+    const inputInterval = document.createElement("input");
+    inputInterval.type = "number";
+    inputInterval.id = "edit-interval";
+    inputInterval.value = task.intervalDays || 7;
 
-    <div class="editor-buttons">
-      <button id="save-task">儲存</button>
-      <button id="cancel-task">取消</button>
-      ${!parentArray ? `<button id="delete-task">刪除任務</button>` : ""}
-    </div>
-  `;
-    document.body.appendChild(editor);
-
-    // 選色行為
-    editor.querySelectorAll(".swatch").forEach(btn => {
-        btn.onclick = () => {
-            editor.querySelectorAll(".swatch").forEach(b => b.classList.remove("selected"));
-            btn.classList.add("selected");
-            task.bgColor = btn.dataset.color || null;
-        };
+    // 底色
+    const labelColor = document.createElement("label");
+    labelColor.textContent = "底色：";
+    const swatchContainer = createColorSwatches(task.bgColor, (btn, color) => {
+        swatchContainer.querySelectorAll(".swatch").forEach(b => b.classList.remove("selected"));
+        btn.classList.add("selected");
+        task.bgColor = color || "";
     });
 
-    // 儲存
-    editor.querySelector("#save-task").onclick = () => {
-        task.title = editor.querySelector("#edit-title").value.trim() || "（未命名）";
-        task.intervalDays = +editor.querySelector("#edit-interval").value || 0;
+    // 編輯按鈕區
+    const editorButtons = document.createElement("div");
+    editorButtons.className = "editor-buttons";
+    const saveBtn = document.createElement("button");
+    saveBtn.id = "save-task";
+    saveBtn.textContent = "儲存";
+    const cancelBtn = document.createElement("button");
+    cancelBtn.id = "cancel-task";
+    cancelBtn.textContent = "取消";
+    editorButtons.append(saveBtn, cancelBtn);
+    if (!parentArray) {
+        const deleteBtn = document.createElement("button");
+        deleteBtn.id = "delete-task";
+        deleteBtn.textContent = "刪除任務";
+        editorButtons.append(deleteBtn);
+    }
 
+    // 組合
+    editor.append(labelTitle, inputTitle, labelInterval, inputInterval, labelColor, swatchContainer, editorButtons);
+    document.body.appendChild(editor);
+
+    saveBtn.onclick = () => {
+        task.title = inputTitle.value.trim() || "（未命名）";
+        task.intervalDays = +inputInterval.value || 0;
         if (parentArray) parentArray.push(task);
-
         saveFile();
-        refreshAll();
         editor.remove();
     };
-
-    editor.querySelector("#cancel-task").onclick = () => editor.remove();
-
-    // 刪除（僅編輯時提供）
+    cancelBtn.onclick = () => editor.remove();
     if (!parentArray) {
         editor.querySelector("#delete-task").onclick = () => {
             if (confirm("確定要刪除這個任務？")) {
@@ -346,24 +357,32 @@ function openTaskEditor(task, parentArray = null) {
                 const { parent, index } = getTaskByPath(path);
                 parent.splice(index, 1);
                 saveFile();
-                refreshAll();
                 editor.remove();
             }
         };
     }
 }
-function newTask() {
-    return {
-        id: Date.now().toString(),
-        title: "",
-        intervalDays: 0,
-        lastCompleted: farFuture,
-        completionDates: [],
-        collapsed: true,
-        children: []
-    };
+function createColorSwatches(selectedColor, onClick) {
+    const container = document.createElement("div");
+    container.className = "color-swatches";
+    colors.forEach(c => {
+        const btn = document.createElement("button");
+        btn.className = "swatch" + (selectedColor === c ? " selected" : "");
+        btn.style.background = c || "transparent";
+        btn.dataset.color = c;
+        btn.title = c || "無";
+        btn.onclick = () => onClick(btn, c);
+        container.appendChild(btn);
+    });
+    return container;
 }
-// 3c. Initialize
+function showToast(msg = "已儲存") {
+    toast.textContent = msg;
+    toast.classList.add("show");
+    setTimeout(() => toast.classList.remove("show"), 2000);
+}
+
+// 4a. Render
 function refreshAll() {
     today = parseDate(new Date());
     updateLastCompleted(tasks);
@@ -371,10 +390,13 @@ function refreshAll() {
     renderTreeRoot();
     renderCalendar();
 }
+function clearChildren(parent) {
+    while (parent.firstChild) parent.removeChild(parent.firstChild);
+}
 
-// 4a. Render task tree
+// 4b. Render task tree
 function renderTreeRoot() {
-    treeRoot.innerHTML = "";
+    clearChildren(treeRoot);
 
     renderTree(tasks, treeRoot);
 
@@ -384,9 +406,7 @@ function renderTreeRoot() {
     rootAddBtn.onclick = () => {
         const t = newTask();
         openTaskEditor(t, tasks);
-
         saveFile();
-        refreshAll();
     };
     treeRoot.appendChild(rootAddBtn);
 }
@@ -419,9 +439,15 @@ function renderTree(data, parentEl, path = []) {
 
         const ctr = document.createElement("span");
         ctr.className = "controls";
-        ctr.innerHTML = `
-      <button class="edit-btn" title="編輯任務">🛠️</button>
-      <button class="add-child-btn" title="新增子任務">➕</button>`;
+        const editBtn = document.createElement("button");
+        editBtn.className = "edit-btn";
+        editBtn.title = "編輯任務";
+        editBtn.textContent = "🛠️";
+        const addChildBtn = document.createElement("button");
+        addChildBtn.className = "add-child-btn";
+        addChildBtn.title = "新增子任務";
+        addChildBtn.textContent = "➕";
+        ctr.append(editBtn, addChildBtn);
 
         line.append(toggleBtn, titleSpan, ctr);
         li.appendChild(line);
@@ -445,21 +471,22 @@ function renderTree(data, parentEl, path = []) {
             parent.splice(evt.newIndex, 0, moved);
 
             saveFile();
-            refreshAll();
         }
     });
 
     parentEl.appendChild(ul);
 }
 
-// 4b. Render calendar grid
+// 4c. Render calendar grid
 function renderCalendar() {
+    clearChildren(dateHead);
+    clearChildren(calBody);
+
     const dates = generateDates();
     const dsArr = dates.map(formatDate);
     const todayStr = formatDate(today);
 
     // header
-    dateHead.innerHTML = "";
     const headFrag = document.createDocumentFragment();
     dsArr.forEach(ds => {
         const th = document.createElement("th");
@@ -475,7 +502,6 @@ function renderCalendar() {
     dateHead.appendChild(headFrag);
 
     // body
-    calBody.innerHTML = "";
     const bodyFrag = document.createDocumentFragment();
     flattenTasks(tasks).forEach(task => {
         const tr = document.createElement("tr");
@@ -513,11 +539,10 @@ function renderCalendar() {
 
         bodyFrag.appendChild(tr);
     });
-
     calBody.appendChild(bodyFrag);
 }
 
-// 5. Event delegation & init
+// 5. Event delegation
 document.addEventListener("DOMContentLoaded", checkFileSystemSupport);
 
 dateHead.addEventListener("click", e => {
@@ -530,7 +555,6 @@ dateHead.addEventListener("click", e => {
     if (holidayDates.has(ds)) holidayDates.delete(ds);
     else holidayDates.add(ds);
 
-    refreshAll();
     saveFile();
 });
 
@@ -558,7 +582,6 @@ treeRoot.addEventListener("click", e => {
 
     if (modified) {
         saveFile();
-        refreshAll();
     }
 });
 
@@ -599,5 +622,4 @@ calTable.addEventListener("click", async e => {
     }
 
     await saveFile();
-    refreshAll();
 });
