@@ -76,6 +76,11 @@ async function loadFile(file) {
     const text = await file.text();
     let data = JSON.parse(text || "[]");
 
+    const headerTitle = document.querySelector("header h1");
+    if (headerTitle) {
+        headerTitle.textContent = file.name;
+    }
+
     if (data.calendarRange) {
         calendarStartDate = data.calendarRange.start ? parseDate(data.calendarRange.start) : null;
         document.getElementById("calendar-start").value = data.calendarRange.start;
