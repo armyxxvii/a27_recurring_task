@@ -1,0 +1,3 @@
+[submodule "wwwroot"]
+	path = wwwroot
+	url = https://github.com/armyxxvii/a27_recurring_task.git
