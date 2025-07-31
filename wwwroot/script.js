@@ -103,7 +103,7 @@ async function loadFile(file) {
 }
 async function saveFile() {
     if (!fileHandle) return;
-    sortDates(); updateLastCompleted(tasks);
+    sortDates();
 
     const payload = {
         tasks,
@@ -123,7 +123,6 @@ async function saveFile() {
 }
 async function downloadFile() {
     sortDates();
-    updateLastCompleted(tasks);
 
     const payload = {
         tasks,
@@ -166,7 +165,7 @@ function sortDates() {
     function recurSort(list) {
         list.forEach(task => {
             if (Array.isArray(task.completionDates)) {
-                task.completionDates.sort();
+                task.completionDates.sort((a, b) => new Date(b) - new Date(a));
             }
             if (task.children?.length) {
                 recurSort(task.children);
@@ -178,11 +177,12 @@ function sortDates() {
 function isToday(d) {
     return formatDate(d) === formatDate(today);
 }
-function diffDays(task, d) {
-    const last = parseDate(task.lastCompleted);
-    const next = new Date(last);
-    next.setDate(last.getDate() + task.intervalDays);
-    return Math.ceil((next - parseDate(d)) / dayMS);
+function diffDays(task, prevCompDate, targetDate) {
+    const last = parseDate(prevCompDate);
+    const next = new Date(last.getTime() + task.intervalDays * dayMS);
+    const target = parseDate(targetDate);
+
+    return Math.ceil((next - target) / dayMS);
 }
 function generateDates() {
     const result = [];
@@ -197,23 +197,6 @@ function generateDates() {
     }
 
     return result;
-}
-function updateLastCompleted(taskList) {
-    const now = today.getTime();
-
-    taskList.forEach(task => {
-        const past = (task.completionDates || [])
-            .map(ds => parseDate(ds).getTime())
-            .filter(t => t <= now);
-
-        task.lastCompleted = past.length
-            ? formatDate(new Date(Math.max(...past)))
-            : farFuture;
-
-        if (task.children?.length) {
-            updateLastCompleted(task.children);
-        }
-    });
 }
 function updateDateRange() {
     const startInput = document.getElementById("calendar-start").value;
@@ -286,7 +269,6 @@ function newTask() {
         title: "",
         intervalDays: 0,
         bgColor: "",
-        lastCompleted: farFuture,
         completionDates: [],
         collapsed: true,
         children: []
@@ -390,7 +372,6 @@ function showToast(msg = "已儲存") {
 // 4a. Render
 function refreshAll() {
     today = parseDate(new Date());
-    updateLastCompleted(tasks);
     buildIdMap(tasks);
     renderTreeRoot();
     renderCalendar();
@@ -511,27 +492,28 @@ function renderCalendar() {
     flattenTasks(tasks).forEach(task => {
         const tr = document.createElement("tr");
         tr.style.background = task.bgColor || "transparent";
-
-        const compSet = new Set(task.completionDates || []);
-        const lastTime = parseDate(task.lastCompleted).getTime();
-        const todayTime = today.getTime();
+        const compDates = (task.completionDates || []).map(parseDate);
 
         dsArr.forEach(ds => {
             const td = document.createElement("td");
-            const currT = parseDate(ds).getTime();
+            const currDate = parseDate(ds);
 
-            if (compSet.has(ds)) {
-                td.classList.add(currT <= todayTime ? "done-past" : "done-future");
-                td.textContent = currT <= todayTime ? "✔︎" : "🕒";
-            }
-            else if (currT <= lastTime) {
-                td.classList.add("normal");
-                td.textContent = ".";
-            }
-            else {
-                const diff = diffDays(task, ds);
+            // 找到當前日期之前最新的完成日
+            const prevCompDate = compDates.find(d => d <= currDate) || null;
+
+            if (compDates.some(d => formatDate(d) === formatDate(currDate))) {
+                // 當前日期是完成日
+                td.classList.add(currDate <= today ? "done-past" : "done-future");
+                td.textContent = currDate <= today ? "✔︎" : "🕒";
+            } else if (prevCompDate) {
+                // 當前日期之前有完成日
+                const diff = diffDays(task, prevCompDate, currDate);
                 td.classList.add(diff >= 0 ? "pending" : "overdue");
                 td.textContent = String(Math.abs(diff));
+            } else {
+                // 當前日期在第一個完成日之前
+                td.classList.add("normal");
+                td.textContent = ".";
             }
 
             if (holidayDates.has(ds)) td.classList.add("holiday");
@@ -605,25 +587,6 @@ calTable.addEventListener("click", async e => {
         found.completionDates.splice(i, 1);
     } else {
         found.completionDates.push(date);
-    }
-
-    // 修正 lastCompleted：僅更新今天以前的完成記錄
-    if (found.completionDates.length) {
-        const valid = found.completionDates
-            .map(str => {
-                const [y, m, d] = str.split("-").map(Number);
-                return new Date(y, m - 1, d);
-            })
-            .filter(d => d <= today);
-
-        if (valid.length) {
-            const latest = valid.sort((a, b) => b - a)[0];
-            found.lastCompleted = formatDate(latest);
-        } else {
-            found.lastCompleted = farFuture;
-        }
-    } else {
-        found.lastCompleted = farFuture;
     }
 
     await saveFile();
