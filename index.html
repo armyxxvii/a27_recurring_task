@@ -1,4 +1,5 @@
-﻿<html lang="zh-TW">
+﻿<!DOCTYPE html>
+<html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -13,9 +14,12 @@
         <div id="controls"></div>
     </header>
     <div class="container">
-        <label class="task-title">顯示範圍：</label>
-        <input type="date" id="calendar-start">～<input type="date" id="calendar-end">
-        <button onclick="updateDateRange()">套用</button>
+        <label>顯示範圍：</label>
+        <label class="task-title" for="calendar-start">始</label>  
+        <input type="date" id="calendar-start" title="選擇開始日期">  
+        <label class="task-title" for="calendar-end">結</label>  
+        <input type="date" id="calendar-end" title="選擇結束日期">
+        <button id="apply-range-btn">套用</button>
     </div>
     <div class="container">
         <div class="scroll-sync">

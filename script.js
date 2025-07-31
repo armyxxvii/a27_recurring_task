@@ -591,3 +591,6 @@ calTable.addEventListener("click", async e => {
 
     await saveFile();
 });
+
+const updateDateRangeBtn = document.getElementById("update-range-btn");
+updateDateRangeBtn.addEventListener("click", updateDateRange);
