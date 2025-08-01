@@ -175,9 +175,6 @@ function sortDates() {
     }
     recurSort(tasks);
 }
-function isToday(d) {
-    return formatDate(d) === formatDate(today);
-}
 function diffDays(task, prevCompDate, targetDate) {
     const last = parseDate(prevCompDate);
     const next = new Date(last.getTime() + task.intervalDays * dayMS);
@@ -587,11 +584,7 @@ function renderCalendar() {
 
 // 5. Event delegation
 document.addEventListener("DOMContentLoaded", checkFileSystemSupport);
-
-applyRangeBtn.addEventListener("pointerdown", updateDateRange);
-
 dateHead.addEventListener("pointerdown", toggleHoliday);
-
 treeRoot.addEventListener("pointerdown", toggleTaskCollapse);
-
 calTable.addEventListener("pointerdown", toggleComplete);
+applyRangeBtn.addEventListener("pointerdown", updateDateRange);

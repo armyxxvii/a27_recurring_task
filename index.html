@@ -3,24 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>任務樹 × 循環行事曆</title>
+    <title>任務樹×循環行事曆</title>
     <link rel="icon" href="icon-192.png" type="image/png" sizes="32x32">
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 </head>
 <body>
     <header class="title-bar container">
-        <h1>任務樹 × 循環行事曆</h1>
+        <h1>802.01</h1>
         <div id="controls"></div>
     </header>
-    <div class="container">
-        <label>顯示範圍：</label>
-        <label class="task-title" for="calendar-start">始</label>  
-        <input type="date" id="calendar-start" title="選擇開始日期">  
-        <label class="task-title" for="calendar-end">結</label>  
-        <input type="date" id="calendar-end" title="選擇結束日期">
-        <button id="apply-range-btn">套用</button>
-    </div>
     <div class="container">
         <div class="scroll-sync">
             <!-- 左欄：任務樹 -->
@@ -36,6 +28,13 @@
                 </table>
             </div>
         </div>
+    </div>
+    <div class="container">
+        <label class="task-title" for="calendar-start">顯示範圍：</label>
+        <input type="date" id="calendar-start" title="選擇開始日期">
+        <label class="task-title" for="calendar-end">~</label>
+        <input type="date" id="calendar-end" title="選擇結束日期">
+        <button id="apply-range-btn">套用</button>
     </div>
 
     <div id="save-toast">已儲存</div>
