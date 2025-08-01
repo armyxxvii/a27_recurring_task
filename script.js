@@ -1,4 +1,5 @@
 ﻿// 1. DOM nodes & global state
+const applyRangeBtn = document.getElementById("apply-range-btn");
 const treeRoot = document.getElementById("task-tree-root");
 const calTable = document.getElementById("calendar-table");
 const dateHead = document.getElementById("date-header");
@@ -41,7 +42,7 @@ function checkFileSystemSupport() {
     if (window.showOpenFilePicker) {
         const openBtn = document.createElement("button");
         openBtn.textContent = "開啟任務 JSON";
-        openBtn.onclick = openFile;
+        openBtn.onpointerdown = openFile;
         controls.appendChild(openBtn);
     } else {
         const input = document.createElement("input");
@@ -52,7 +53,7 @@ function checkFileSystemSupport() {
 
         downloadBtn = document.createElement("button");
         downloadBtn.textContent = "下載任務檔";
-        downloadBtn.onclick = downloadFile;
+        downloadBtn.onpointerdown = downloadFile;
         downloadBtn.disabled = true;
         controls.appendChild(downloadBtn);
     }
@@ -207,6 +208,37 @@ function updateDateRange() {
 
     saveFile();
 }
+function toggleHoliday(event) {
+    const th = event.target.closest("th[data-date]");
+    if (!th) return;
+
+    const ds = th?.dataset?.date;
+    if (!ds) return;
+
+    if (holidayDates.has(ds)) holidayDates.delete(ds);
+    else holidayDates.add(ds);
+
+    saveFile();
+}
+async function toggleComplete(event) {
+    const td = event.target.closest("td[data-id]");
+    if (!td) return;
+
+    const { id, date } = td.dataset;
+
+    const found = idMap.get(id);
+    if (!found) return;
+
+    // 切換完成狀態
+    const i = found.completionDates.indexOf(date);
+    if (i >= 0) {
+        found.completionDates.splice(i, 1);
+    } else {
+        found.completionDates.push(date);
+    }
+
+    await saveFile();
+}
 
 // 3b. Tasks
 function buildIdMap(list) {
@@ -274,6 +306,30 @@ function newTask() {
         children: []
     };
 }
+function toggleTaskCollapse(event) {
+    const li = event.target.closest(".task-node");
+    if (!li) return;
+
+    const path = li.dataset.path.split(",").map(Number);
+    const { task } = getTaskByPath(path);
+    let modified = false;
+
+    if (event.target.matches(".toggle-btn")) {
+        task.collapsed = !task.collapsed;
+        modified = true;
+    }
+    else if (event.target.matches(".add-child-btn")) {
+        if (!Array.isArray(task.children)) {
+            task.children = [];
+        }
+        openTaskEditor(newTask(), task.children);
+    }
+    else if (event.target.matches(".edit-btn")) {
+        openTaskEditor(task);
+    }
+
+    if (modified) saveFile();
+};
 
 // 3c. Window
 function openTaskEditor(task, parentArray = null) {
@@ -329,16 +385,16 @@ function openTaskEditor(task, parentArray = null) {
     editor.append(labelTitle, inputTitle, labelInterval, inputInterval, labelColor, swatchContainer, editorButtons);
     document.body.appendChild(editor);
 
-    saveBtn.onclick = () => {
+    saveBtn.onpointerdown = () => {
         task.title = inputTitle.value.trim() || "（未命名）";
         task.intervalDays = +inputInterval.value || 0;
         if (parentArray) parentArray.push(task);
         saveFile();
         editor.remove();
     };
-    cancelBtn.onclick = () => editor.remove();
+    cancelBtn.onpointerdown = () => editor.remove();
     if (!parentArray) {
-        editor.querySelector("#delete-task").onclick = () => {
+        editor.querySelector("#delete-task").onpointerdown = () => {
             if (confirm("確定要刪除這個任務？")) {
                 const path = findTaskPath(task);
                 const { parent, index } = getTaskByPath(path);
@@ -349,7 +405,7 @@ function openTaskEditor(task, parentArray = null) {
         };
     }
 }
-function createColorSwatches(selectedColor, onClick) {
+function createColorSwatches(selectedColor, onpointerdown) {
     const container = document.createElement("div");
     container.className = "color-swatches";
     colors.forEach(c => {
@@ -358,7 +414,7 @@ function createColorSwatches(selectedColor, onClick) {
         btn.style.background = c || "transparent";
         btn.dataset.color = c;
         btn.title = c || "無";
-        btn.onclick = () => onClick(btn, c);
+        btn.onpointerdown = () => onpointerdown(btn, c);
         container.appendChild(btn);
     });
     return container;
@@ -389,7 +445,7 @@ function renderTreeRoot() {
     const rootAddBtn = document.createElement("button");
     rootAddBtn.className = "add-root-task-btn";
     rootAddBtn.textContent = "➕ 新增任務";
-    rootAddBtn.onclick = () => {
+    rootAddBtn.onpointerdown = () => {
         const t = newTask();
         openTaskEditor(t, tasks);
         saveFile();
@@ -532,65 +588,10 @@ function renderCalendar() {
 // 5. Event delegation
 document.addEventListener("DOMContentLoaded", checkFileSystemSupport);
 
-dateHead.addEventListener("click", e => {
-    const th = e.target.closest("th[data-date]");
-    if (!th) return;
+applyRangeBtn.addEventListener("pointerdown", updateDateRange);
 
-    const ds = th?.dataset?.date;
-    if (!ds) return;
+dateHead.addEventListener("pointerdown", toggleHoliday);
 
-    if (holidayDates.has(ds)) holidayDates.delete(ds);
-    else holidayDates.add(ds);
+treeRoot.addEventListener("pointerdown", toggleTaskCollapse);
 
-    saveFile();
-});
-
-treeRoot.addEventListener("click", e => {
-    const li = e.target.closest(".task-node");
-    if (!li) return;
-
-    const path = li.dataset.path.split(",").map(Number);
-    const { task } = getTaskByPath(path);
-    let modified = false;
-
-    if (e.target.matches(".toggle-btn")) {
-        task.collapsed = !task.collapsed;
-        modified = true;
-    }
-    else if (e.target.matches(".add-child-btn")) {
-        if (!Array.isArray(task.children)) {
-            task.children = [];
-        }
-        openTaskEditor(newTask(), task.children);
-    }
-    else if (e.target.matches(".edit-btn")) {
-        openTaskEditor(task);
-    }
-
-    if (modified) {
-        saveFile();
-    }
-});
-
-calTable.addEventListener("click", async e => {
-    const td = e.target.closest("td[data-id]");
-    if (!td) return;
-
-    const { id, date } = td.dataset;
-
-    const found = idMap.get(id);
-    if (!found) return;
-
-    // 切換完成狀態
-    const i = found.completionDates.indexOf(date);
-    if (i >= 0) {
-        found.completionDates.splice(i, 1);
-    } else {
-        found.completionDates.push(date);
-    }
-
-    await saveFile();
-});
-
-const updateDateRangeBtn = document.getElementById("update-range-btn");
-updateDateRangeBtn.addEventListener("click", updateDateRange);
+calTable.addEventListener("pointerdown", toggleComplete);
