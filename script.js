@@ -34,7 +34,7 @@ let calendarStartDate = null;
 let calendarEndDate = null;
 
 
-// 2. File I/O: open, save & toast
+// 2. File I/O: open, save
 function checkFileSystemSupport() {
     const controls = document.getElementById("controls");
     clearChildren(controls);
@@ -42,6 +42,7 @@ function checkFileSystemSupport() {
     if (window.showOpenFilePicker) {
         const openBtn = document.createElement("button");
         openBtn.textContent = "開啟任務 JSON";
+        openBtn.type = "button";
         openBtn.onpointerdown = openFile;
         controls.appendChild(openBtn);
     } else {
@@ -53,6 +54,7 @@ function checkFileSystemSupport() {
 
         downloadBtn = document.createElement("button");
         downloadBtn.textContent = "下載任務檔";
+        downloadBtn.type = "button";
         downloadBtn.onpointerdown = downloadFile;
         downloadBtn.disabled = true;
         controls.appendChild(downloadBtn);
@@ -411,6 +413,7 @@ function createColorSwatches(selectedColor, onpointerdown) {
         btn.style.background = c || "transparent";
         btn.dataset.color = c;
         btn.title = c || "無";
+        btn.type = "button";
         btn.onpointerdown = () => onpointerdown(btn, c);
         container.appendChild(btn);
     });
@@ -442,6 +445,7 @@ function renderTreeRoot() {
     const rootAddBtn = document.createElement("button");
     rootAddBtn.className = "add-root-task-btn";
     rootAddBtn.textContent = "➕ 新增任務";
+    rootAddBtn.type = "button";
     rootAddBtn.onpointerdown = () => {
         const t = newTask();
         openTaskEditor(t, tasks);
