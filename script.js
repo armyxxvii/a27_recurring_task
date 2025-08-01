@@ -105,24 +105,25 @@ async function loadFile(file) {
     showToast("已載入");
 }
 async function saveFile() {
-    if (!fileHandle) return;
     sortDates();
-
-    const payload = {
-        tasks,
-        holidays: Array.from(holidayDates),
-        calendarRange: {
-            start: calendarStartDate ? formatDate(calendarStartDate) : null,
-            end: calendarEndDate ? formatDate(calendarEndDate) : null
-        }
-    };
-
-    const w = await fileHandle.createWritable();
-    await w.write(JSON.stringify(payload, null, 2));
-    await w.close();
-
     refreshAll();
-    showToast("已儲存");
+
+    if (fileHandle) {
+        const payload = {
+            tasks,
+            holidays: Array.from(holidayDates),
+            calendarRange: {
+                start: calendarStartDate ? formatDate(calendarStartDate) : null,
+                end: calendarEndDate ? formatDate(calendarEndDate) : null
+            }
+        };
+
+        const w = await fileHandle.createWritable();
+        await w.write(JSON.stringify(payload, null, 2));
+        await w.close();
+
+        showToast("已儲存");
+    } else showToast("已修改");
 }
 async function downloadFile() {
     sortDates();
