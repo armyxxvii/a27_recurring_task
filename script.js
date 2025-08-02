@@ -598,7 +598,7 @@ function renderCalendar() {
 
 // 5. Event delegation
 document.addEventListener("DOMContentLoaded", checkFileSystemSupport);
-dateHead.addEventListener("pointerdown", toggleHoliday);
-treeRoot.addEventListener("pointerdown", toggleTaskCollapse);
-calTable.addEventListener("pointerdown", toggleComplete);
-applyRangeBtn.addEventListener("pointerdown", updateDateRange);
+dateHead.addEventListener("click", toggleHoliday);
+treeRoot.addEventListener("click", toggleTaskCollapse);
+calTable.addEventListener("click", toggleComplete);
+applyRangeBtn.addEventListener("click", updateDateRange);
