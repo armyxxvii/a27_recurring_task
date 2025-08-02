@@ -123,7 +123,7 @@ async function saveFile() {
         await w.close();
 
         showToast("已儲存");
-    } else showToast("已修改");
+    } else showToast("修改未儲存");
 }
 async function downloadFile() {
     sortDates();
@@ -436,6 +436,11 @@ function refreshAll() {
 function clearChildren(parent) {
     while (parent.firstChild) parent.removeChild(parent.firstChild);
 }
+function createFa(iconClass, parentElement) {
+    const icon = document.createElement("i");
+    icon.className = `fas ${iconClass}`;
+    parentElement.appendChild(icon);
+}
 
 // 4b. Render task tree
 function renderTreeRoot() {
@@ -467,12 +472,13 @@ function renderTree(data, parentEl, path = []) {
         line.className = "task-line";
         line.style.background = task.bgColor || "transparent";
 
+        const hasChildren = Array.isArray(task.children) && task.children.length > 0;
         const toggleBtn = document.createElement("button");
         toggleBtn.className = "toggle-btn";
-        toggleBtn.innerHTML = `${task.collapsed ? "⯈" : "⯆"}`;
-
-        const hasChildren = Array.isArray(task.children) && task.children.length > 0;
-        if (!hasChildren) {
+        if (hasChildren) {
+            createFa(task.collapsed ? "fa-chevron-right" : "fa-chevron-down", toggleBtn);
+        } else {
+            createFa("fa-minus", toggleBtn);
             toggleBtn.disabled = true;
             task.collapsed = true;
         }
@@ -483,14 +489,17 @@ function renderTree(data, parentEl, path = []) {
 
         const ctr = document.createElement("span");
         ctr.className = "controls";
+
         const editBtn = document.createElement("button");
         editBtn.className = "edit-btn";
         editBtn.title = "編輯任務";
-        editBtn.textContent = "🛠️";
+        createFa("fa-pencil", editBtn);
+
         const addChildBtn = document.createElement("button");
         addChildBtn.className = "add-child-btn";
         addChildBtn.title = "新增子任務";
-        addChildBtn.textContent = "➕";
+        createFa("fa-baby", addChildBtn);
+
         ctr.append(editBtn, addChildBtn);
 
         line.append(toggleBtn, titleSpan, ctr);
@@ -562,7 +571,7 @@ function renderCalendar() {
             if (compDates.some(d => formatDate(d) === formatDate(currDate))) {
                 // 當前日期是完成日
                 td.classList.add(currDate <= today ? "done-past" : "done-future");
-                td.textContent = currDate <= today ? "✔︎" : "🕒";
+                createFa(currDate <= today ? "fa-check" : "fa-paperclip", td);
             } else if (prevCompDate) {
                 // 當前日期之前有完成日
                 const diff = diffDays(task, prevCompDate, currDate);
