@@ -264,7 +264,7 @@ function flattenTasks(data, parentPath = [], visible = true) {
         }
 
         const showChildren = !task.collapsed;
-        if (task.children?.length) {
+        if (showChildren && task.children?.length) {
             list.push(...flattenTasks(task.children, path, showChildren));
         }
     });
