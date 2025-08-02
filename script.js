@@ -10,18 +10,18 @@ const holidayDates = new Set();
 const farFuture = "2700-02-27";
 const dayMS = 1000 * 60 * 60 * 24;
 const colors = [
-    "",            // 無底色
-    "#b3b3ff",     // 靛紫／輕柔
-    "#b0c4de",     // 藍灰／輕柔
-    "#fff1a8",     // 沙黃／輕柔
-    "#e1bee7",     // 藕色／輕柔
-    "#ffe6cc",     // 橘茶／輕柔
-    "#bbbbbb",     // 中性灰
-    "#5c6bc0",     // 靛紫／溫和
-    "#607d8b",     // 藍灰／溫和
-    "#fdd835",     // 沙黃／溫和
-    "#ab47bc",     // 藕色／溫和
-    "#ffb74d",     // 橘茶／溫和
+    "",         // 無底色
+    "#ddf",     // 靛紫／輕柔
+    "#cef",     // 藍灰／輕柔
+    "#ffd",     // 沙黃／輕柔
+    "#fdf",     // 藕色／輕柔
+    "#fec",     // 橘茶／輕柔
+    "#bbb",     // 中性灰
+    "#aad",     // 靛紫／溫和
+    "#7bd",     // 藍灰／溫和
+    "#dc9",     // 沙黃／溫和
+    "#dad",     // 藕色／溫和
+    "#fb5",     // 橘茶／溫和
 ];
 const idMap = new Map();
 
@@ -300,7 +300,7 @@ function newTask() {
         id: Date.now().toString(),
         title: "",
         intervalDays: 0,
-        bgColor: "",
+        swatchId: 0,
         completionDates: [],
         collapsed: true,
         children: []
@@ -358,10 +358,10 @@ function openTaskEditor(task, parentArray = null) {
     // 底色
     const labelColor = document.createElement("label");
     labelColor.textContent = "底色：";
-    const swatchContainer = createColorSwatches(task.bgColor, (btn, color) => {
+    const swatchContainer = createColorSwatches(task.swatchId, (btn, swatchId) => {
         swatchContainer.querySelectorAll(".swatch").forEach(b => b.classList.remove("selected"));
         btn.classList.add("selected");
-        task.bgColor = color || "";
+        task.swatchId = swatchId;
     });
 
     // 編輯按鈕區
@@ -405,17 +405,17 @@ function openTaskEditor(task, parentArray = null) {
         };
     }
 }
-function createColorSwatches(selectedColor, onpointerdown) {
+function createColorSwatches(selectedSwatchId, onpointerdown) {
     const container = document.createElement("div");
     container.className = "color-swatches";
-    colors.forEach(c => {
+    colors.forEach((color, index) => {
         const btn = document.createElement("button");
-        btn.className = "swatch" + (selectedColor === c ? " selected" : "");
-        btn.style.background = c || "transparent";
-        btn.dataset.color = c;
-        btn.title = c || "無";
+        btn.className = "swatch" + (selectedSwatchId === index ? " selected" : "");
+        btn.style.background = color || "transparent";
+        btn.dataset.swatchId = index;
+        btn.title = color || "無";
         btn.type = "button";
-        btn.onpointerdown = () => onpointerdown(btn, c);
+        btn.onpointerdown = () => onpointerdown(btn, index);
         container.appendChild(btn);
     });
     return container;
@@ -470,7 +470,7 @@ function renderTree(data, parentEl, path = []) {
 
         const line = document.createElement("div");
         line.className = "task-line";
-        line.style.background = task.bgColor || "transparent";
+        line.style.background = colors[task.swatchId] || "transparent";
 
         const hasChildren = Array.isArray(task.children) && task.children.length > 0;
         const toggleBtn = document.createElement("button");
@@ -558,7 +558,7 @@ function renderCalendar() {
     const bodyFrag = document.createDocumentFragment();
     flattenTasks(tasks).forEach(task => {
         const tr = document.createElement("tr");
-        tr.style.background = task.bgColor || "transparent";
+        tr.style.background = colors[task.swatchId] || "transparent";
         const compDates = (task.completionDates || []).map(parseDate);
 
         dsArr.forEach(ds => {
