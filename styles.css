@@ -45,17 +45,47 @@ button i {
     flex-wrap: wrap; /* RWD */
 }
 
-    .title-bar h1 {
-        font-size: 1.3rem;
-        margin: 0;
-        flex-shrink: 1;
-    }
-
     .title-bar sub,
     .title-bar sup,
     .title-bar small {
         font-size: 0.8rem;
     }
+
+h1 {
+    font-size: 1.3rem;
+    margin: 0;
+    flex-shrink: 1;
+}
+
+h2 {
+    font-size: 1.2rem;
+    margin: 0;
+    flex-shrink: 1;
+}
+
+h3 {
+    font-size: 1.1rem;
+    margin: 0;
+    flex-shrink: 1;
+}
+
+h4 {
+    font-size: 1rem;
+    margin: 0;
+    flex-shrink: 1;
+}
+
+h5 {
+    font-size: 0.9rem;
+    margin: 0;
+    flex-shrink: 1;
+}
+
+h6 {
+    font-size: 0.8rem;
+    margin: 0;
+    flex-shrink: 1;
+}
 
 #controls {
     display: flex;
@@ -117,7 +147,7 @@ ul.task-tree {
 }
 
 /* 底部新增按鈕 */
-.add-root-task-btn {
+.add-new-btn {
     height: 25px;
     width: -webkit-fill-available;
     margin-left: 1rem;
@@ -276,3 +306,73 @@ ul.task-tree {
     #save-toast.show {
         opacity: 1;
     }
+
+/* 通用列表項目 */
+.list-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.2rem;
+    padding: 0.2rem;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.list-item-text {
+    flex-grow: 1;
+    font-size: 0.8rem;
+    color: #333;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.list-item button {
+    font-size: 0.8rem;
+    padding: 0.1rem;
+    color: #fff;
+    background: #8b8b8b;
+    border: none;
+    cursor: pointer;
+    border-radius: 4px;
+    margin-left: 0.2rem;
+}
+
+.list-item button:hover {
+    background: #666;
+}
+
+/* 通用編輯視窗 */
+.editor {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #fff;
+    border: 1px solid #999;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    padding: 1rem;
+    z-index: 1000;
+    border-radius: 8px;
+    width: 250px;
+}
+
+.editor label {
+    display: block;
+    margin-top: 0.5rem;
+    font-weight: bold;
+}
+
+.editor input {
+    width: 100%;
+    padding: 0.3rem;
+    margin-top: 0.2rem;
+    box-sizing: border-box;
+}
+
+.editor-buttons {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 1rem;
+}

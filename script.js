@@ -5,6 +5,8 @@ const calTable = document.getElementById("calendar-table");
 const dateHead = document.getElementById("date-header");
 const calBody = document.getElementById("calendar-body");
 const toast = document.getElementById("save-toast");
+const memoList = document.getElementById("memo-list");
+const addMemoBtn = document.getElementById("add-memo-btn");
 
 const holidayDates = new Set();
 const farFuture = "2700-02-27";
@@ -32,7 +34,7 @@ let downloadBtn = null;
 let today;
 let calendarStartDate = null;
 let calendarEndDate = null;
-
+let memos = [];
 
 // 2. File I/O: open, save
 function checkFileSystemSupport() {
@@ -77,7 +79,7 @@ async function inputFile(event) {
 }
 async function loadFile(file) {
     const text = await file.text();
-    let data = JSON.parse(text || "[]");
+    let data = JSON.parse(text || "{}");
 
     const headerTitle = document.querySelector("header h1");
     if (headerTitle) {
@@ -91,17 +93,21 @@ async function loadFile(file) {
         document.getElementById("calendar-end").value = data.calendarRange.end;
     }
 
-    if (Array.isArray(data)) {
-        tasks = data;
-        holidayDates.clear();
-    } else {
-        tasks = Array.isArray(data.tasks) ? data.tasks : [];
+    if (Array.isArray(data.tasks)) {
+        tasks = data.tasks;
         holidayDates.clear();
         (data.holidays || []).forEach(d => holidayDates.add(d));
+    } else {
+        tasks = [];
+        holidayDates.clear();
     }
+
+    // 整合 memos 的載入
+    memos = Array.isArray(data.memos) ? data.memos : [];
 
     currentFilename = file.name || currentFilename;
     refreshAll();
+    renderMemoList(); // 渲染備忘列表
     showToast("已載入");
 }
 async function saveFile() {
@@ -115,7 +121,8 @@ async function saveFile() {
             calendarRange: {
                 start: calendarStartDate ? formatDate(calendarStartDate) : null,
                 end: calendarEndDate ? formatDate(calendarEndDate) : null
-            }
+            },
+            memos // 整合 memos 的儲存
         };
 
         const w = await fileHandle.createWritable();
@@ -331,13 +338,28 @@ function toggleTaskCollapse(event) {
     if (modified) saveFile();
 };
 
+// 3c.memo
+function addMemo() {
+    const newMemo = { text: "新備忘事項" };
+    memos.push(newMemo);
+    renderMemoList();
+    saveFile();
+}
+function deleteMemo(index) {
+    if (confirm("確定要刪除這個備忘事項？")) {
+        memos.splice(index, 1);
+        renderMemoList();
+        saveFile();
+    }
+}
+
 // 3c. Window
 function openTaskEditor(task, parentArray = null) {
     document.querySelector("#task-editor")?.remove();
 
     const editor = document.createElement("div");
     editor.id = "task-editor";
-    editor.className = "task-editor";
+    editor.className = "editor";
 
     // 任務名稱
     const labelTitle = document.createElement("label");
@@ -420,6 +442,35 @@ function createColorSwatches(selectedSwatchId, onpointerdown) {
     });
     return container;
 }
+function openMemoEditor(memo, index) {
+    document.querySelector(".task-editor")?.remove();
+
+    const editor = document.createElement("div");
+    editor.className = "task-editor"; // 使用 task tree 的編輯器樣式
+
+    const label = document.createElement("label");
+    label.textContent = "備忘內容：";
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = memo.text;
+
+    const saveBtn = document.createElement("button");
+    saveBtn.textContent = "儲存";
+    saveBtn.onclick = () => {
+        memo.text = input.value.trim() || "（未命名）";
+        renderMemoList();
+        saveFile();
+        editor.remove();
+    };
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.textContent = "取消";
+    cancelBtn.onclick = () => editor.remove();
+
+    editor.append(label, input, saveBtn, cancelBtn);
+    document.body.appendChild(editor);
+}
 function showToast(msg = "已儲存") {
     toast.textContent = msg;
     toast.classList.add("show");
@@ -449,7 +500,7 @@ function renderTreeRoot() {
     renderTree(tasks, treeRoot);
 
     const rootAddBtn = document.createElement("button");
-    rootAddBtn.className = "add-root-task-btn";
+    rootAddBtn.className = "add-new-btn";
     rootAddBtn.textContent = "➕ 新增任務";
     rootAddBtn.type = "button";
     rootAddBtn.onpointerdown = () => {
@@ -596,9 +647,43 @@ function renderCalendar() {
     calBody.appendChild(bodyFrag);
 }
 
+// 4d. Render memo
+function renderMemoList() {
+    clearChildren(memoList);
+
+    memos.forEach((memo, index) => {
+        const li = document.createElement("li");
+        li.className = "task-node"; // 使用 task tree 的樣式
+
+        const line = document.createElement("div");
+        line.className = "task-line"; // 使用 task tree 的樣式
+
+        const textSpan = document.createElement("span");
+        textSpan.textContent = memo.text;
+        textSpan.className = "task-title"; // 使用 task tree 的樣式
+
+        const editBtn = document.createElement("button");
+        editBtn.className = "edit-btn";
+        editBtn.title = "編輯備忘";
+        createFa("fa-pencil", editBtn); // 使用 Font Awesome 圖示
+        editBtn.onclick = () => openMemoEditor(memo, index);
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "delete-btn";
+        deleteBtn.title = "刪除備忘";
+        createFa("fa-trash", deleteBtn); // 使用 Font Awesome 圖示
+        deleteBtn.onclick = () => deleteMemo(index);
+
+        line.append(textSpan, editBtn, deleteBtn);
+        li.appendChild(line);
+        memoList.appendChild(li);
+    });
+}
+
 // 5. Event delegation
 document.addEventListener("DOMContentLoaded", checkFileSystemSupport);
 dateHead.addEventListener("click", toggleHoliday);
+applyRangeBtn.addEventListener("click", updateDateRange);
 treeRoot.addEventListener("click", toggleTaskCollapse);
 calTable.addEventListener("click", toggleComplete);
-applyRangeBtn.addEventListener("click", updateDateRange);
+addMemoBtn.addEventListener("click", addMemo);
