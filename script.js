@@ -5,8 +5,10 @@ const calTable = document.getElementById("calendar-table");
 const dateHead = document.getElementById("date-header");
 const calBody = document.getElementById("calendar-body");
 const toast = document.getElementById("save-toast");
+const listroot = document.getElementById("list-root");
+const listContainer = document.getElementById("list-container");
+const memoroot = document.getElementById("memo-root");
 const memoList = document.getElementById("memo-list");
-const addMemoBtn = document.getElementById("add-memo-btn");
 
 const holidayDates = new Set();
 const farFuture = "2700-02-27";
@@ -34,6 +36,7 @@ let downloadBtn = null;
 let today;
 let calendarStartDate = null;
 let calendarEndDate = null;
+let lists = [];
 let memos = [];
 
 // 2. File I/O: open, save
@@ -102,12 +105,22 @@ async function loadFile(file) {
         holidayDates.clear();
     }
 
-    // 整合 memos 的載入
     memos = Array.isArray(data.memos) ? data.memos : [];
+
+    // lists: 保持 doneNumbers 為 array
+    if (Array.isArray(data.lists)) {
+        lists = data.lists.map(list => ({
+            ...list,
+            doneNumbers: Array.isArray(list.doneNumbers) ? list.doneNumbers : []
+        }));
+    } else {
+        lists = [];
+    }
 
     currentFilename = file.name || currentFilename;
     refreshAll();
-    renderMemoList(); // 渲染備忘列表
+    renderMemos();
+    renderLists();
     showToast("已載入");
 }
 async function saveFile() {
@@ -122,7 +135,8 @@ async function saveFile() {
                 start: calendarStartDate ? formatDate(calendarStartDate) : null,
                 end: calendarEndDate ? formatDate(calendarEndDate) : null
             },
-            memos // 整合 memos 的儲存
+            memos,
+            lists // 直接存 array
         };
 
         const w = await fileHandle.createWritable();
@@ -338,19 +352,33 @@ function toggleTaskCollapse(event) {
     if (modified) saveFile();
 };
 
-// 3c.memo
-function addMemo() {
-    const newMemo = { text: "新備忘事項", swatchId: 0 };
-    memos.push(newMemo);
-    renderMemoList();
-    saveFile();
-}
+// 3c. Memo
 function deleteMemo(index) {
     if (confirm("確定要刪除這個備忘事項？")) {
         memos.splice(index, 1);
-        renderMemoList();
+        renderMemos();
         saveFile();
     }
+}
+function toggleListItem(list, number) {
+    const idx = list.doneNumbers.indexOf(number);
+    if (idx >= 0) {
+        list.doneNumbers.splice(idx, 1);
+    } else {
+        list.doneNumbers.push(number);
+    }
+    renderLists();
+    saveFile();
+}
+function clearListDone(list) {
+    list.doneNumbers = [];
+    renderLists();
+    saveFile();
+}
+function deleteList(id) {
+    lists = lists.filter(list => list.id !== id);
+    renderLists();
+    saveFile();
 }
 
 // 3c. Window
@@ -445,6 +473,9 @@ function createColorSwatches(selectedSwatchId, onpointerdown) {
 function openMemoEditor(memo, index) {
     document.querySelector(".task-editor")?.remove();
 
+    const isNew = !memo;
+    memo = memo || { text: "", swatchId: 0 };
+
     const editor = document.createElement("div");
     editor.className = "task-editor";
 
@@ -463,11 +494,15 @@ function openMemoEditor(memo, index) {
         memo.swatchId = swatchId;
     });
 
+    const editorButtons = document.createElement("div");
+    editorButtons.className = "editor-buttons";
+
     const saveBtn = document.createElement("button");
     saveBtn.textContent = "儲存";
     saveBtn.onclick = () => {
         memo.text = input.value.trim() || "（未命名）";
-        renderMemoList();
+        if (isNew) memos.push(memo);
+        renderMemos();
         saveFile();
         editor.remove();
     };
@@ -476,7 +511,74 @@ function openMemoEditor(memo, index) {
     cancelBtn.textContent = "取消";
     cancelBtn.onclick = () => editor.remove();
 
-    editor.append(label, input, labelColor, swatchContainer, saveBtn, cancelBtn);
+    editorButtons.append(saveBtn, cancelBtn);
+
+    editor.append(label, input, labelColor, swatchContainer, editorButtons);
+    document.body.appendChild(editor);
+}
+function openListEditor(list) {
+    document.querySelector(".task-editor")?.remove();
+
+    const isNew = !list;
+    list = list || {
+        name: "",
+        startNumber: 1,
+        endNumber: 10,
+        swatchId: 0,
+        doneNumbers: []
+    };
+
+    const editor = document.createElement("div");
+    editor.className = "task-editor";
+
+    const labelName = document.createElement("label");
+    labelName.textContent = "清單名稱：";
+    const inputName = document.createElement("input");
+    inputName.type = "text";
+    inputName.value = list.name;
+
+    const labelStart = document.createElement("label");
+    labelStart.textContent = "開始編號：";
+    const inputStart = document.createElement("input");
+    inputStart.type = "number";
+    inputStart.value = list.startNumber;
+
+    const labelEnd = document.createElement("label");
+    labelEnd.textContent = "結束編號：";
+    const inputEnd = document.createElement("input");
+    inputEnd.type = "number";
+    inputEnd.value = list.endNumber;
+
+    const labelColor = document.createElement("label");
+    labelColor.textContent = "底色：";
+    const swatchContainer = createColorSwatches(list.swatchId, (btn, swatchId) => {
+        swatchContainer.querySelectorAll(".swatch").forEach(b => b.classList.remove("selected"));
+        btn.classList.add("selected");
+        list.swatchId = swatchId;
+    });
+
+    const editorButtons = document.createElement("div");
+    editorButtons.className = "editor-buttons";
+
+    const saveBtn = document.createElement("button");
+    saveBtn.textContent = "儲存";
+    saveBtn.onclick = () => {
+        list.name = inputName.value.trim() || "未命名清單";
+        list.startNumber = +inputStart.value || 1;
+        list.endNumber = +inputEnd.value || 10;
+        if (isNew) lists.push(list);
+        renderLists();
+        saveFile();
+        editor.remove();
+    };
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.textContent = "取消";
+    cancelBtn.onclick = () => editor.remove();
+
+    editorButtons.append(saveBtn, cancelBtn);
+
+    editor.append(labelName, inputName, labelStart, inputStart, labelEnd, inputEnd, labelColor, swatchContainer, editorButtons);
     document.body.appendChild(editor);
 }
 function showToast(msg = "已儲存") {
@@ -656,8 +758,14 @@ function renderCalendar() {
 }
 
 // 4d. Render memo
-function renderMemoList() {
+function renderMemos() {
     clearChildren(memoList);
+    clearChildren(memoroot);
+
+    // 動態生成 ul
+    const ul = document.createElement("ul");
+    ul.id = "memo-list";
+    ul.className = "task-tree";
 
     memos.forEach((memo, index) => {
         const li = document.createElement("li");
@@ -685,8 +793,106 @@ function renderMemoList() {
 
         line.append(textSpan, editBtn, deleteBtn);
         li.appendChild(line);
-        memoList.appendChild(li);
+        ul.appendChild(li);
     });
+
+    // 新增按鈕（ul之後）
+    const addBtn = document.createElement("button");
+    addBtn.className = "add-new-btn";
+    addBtn.type = "button";
+    addBtn.textContent = "➕ 新增備忘";
+    addBtn.onclick = () => openMemoEditor();
+
+    memoroot.appendChild(ul);
+    memoroot.appendChild(addBtn);
+}
+
+function renderLists() {
+    clearChildren(listContainer);
+    clearChildren(listroot);
+
+    // 動態生成 ul
+    const ul = document.createElement("ul");
+    ul.id = "list-container";
+    ul.className = "task-tree";
+
+    lists.forEach(list => {
+        const li = document.createElement("li");
+        li.className = "task-node";
+
+        // 標題列（含操作按鈕）
+        const titleRow = document.createElement("div");
+        titleRow.style.display = "flex";
+        titleRow.style.alignItems = "center";
+        titleRow.style.justifyContent = "space-between";
+        titleRow.style.marginBottom = "0.2rem";
+
+        const title = document.createElement("span");
+        title.textContent = list.name;
+        title.className = "task-title";
+
+        const btnBar = document.createElement("span");
+        btnBar.style.display = "flex";
+        btnBar.style.gap = "0.3rem";
+
+        const editBtn = document.createElement("button");
+        editBtn.className = "edit-btn";
+        editBtn.title = "編輯清單";
+        createFa("fa-pencil", editBtn);
+        editBtn.onclick = () => openListEditor(list);
+
+        const clearBtn = document.createElement("button");
+        clearBtn.className = "clear-btn";
+        clearBtn.title = "清除所有完成";
+        createFa("fa-eraser", clearBtn);
+        clearBtn.onclick = () => clearListDone(list);
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "delete-btn";
+        deleteBtn.title = "刪除清單";
+        createFa("fa-trash", deleteBtn);
+        deleteBtn.onclick = () => deleteList(list.id);
+
+        btnBar.append(editBtn, clearBtn, deleteBtn);
+        titleRow.append(title, btnBar);
+
+        // table
+        const tableDiv = document.createElement("div");
+        tableDiv.className = "calendar-column";
+
+        const table = document.createElement("table");
+        table.className = "calendar-table";
+        table.style.marginBottom = "0.5rem";
+        table.style.width = "auto";
+        table.style.background = colors[list.swatchId] || "transparent";
+
+        const tbody = document.createElement("tbody");
+        const trBody = document.createElement("tr");
+        for (let i = list.startNumber; i <= list.endNumber; i++) {
+            const td = document.createElement("td");
+            td.textContent = i;
+            td.className = list.doneNumbers.includes(i) ? "done-past" : "normal";
+            td.style.cursor = "pointer";
+            td.onclick = () => toggleListItem(list, i);
+            trBody.appendChild(td);
+        }
+        tbody.appendChild(trBody);
+        table.appendChild(tbody);
+        tableDiv.append(table);
+
+        li.append(titleRow, tableDiv);
+        ul.appendChild(li);
+    });
+
+    // 新增按鈕（ul之後）
+    const addBtn = document.createElement("button");
+    addBtn.className = "add-new-btn";
+    addBtn.type = "button";
+    addBtn.textContent = "➕ 新增清單";
+    addBtn.onclick = () => openListEditor();
+
+    listroot.appendChild(ul);
+    listroot.appendChild(addBtn);
 }
 
 // 5. Event delegation
@@ -695,4 +901,3 @@ dateHead.addEventListener("click", toggleHoliday);
 applyRangeBtn.addEventListener("click", updateDateRange);
 treeRoot.addEventListener("click", toggleTaskCollapse);
 calTable.addEventListener("click", toggleComplete);
-addMemoBtn.addEventListener("click", addMemo);

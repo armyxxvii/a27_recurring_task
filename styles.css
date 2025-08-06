@@ -115,12 +115,12 @@ ul.task-tree {
     margin: 0;
 }
 
-    .task-tree button {
-        width: 1rem;
-        height: 1rem;
-        font-size: 0.6rem;
-        margin: 0.1rem;
-    }
+.task-tree button {
+    width: 1rem;
+    height: 1rem;
+    font-size: 0.6rem;
+    margin: 0.1rem;
+}
 
 .task-line {
     padding: 0px 1px;
@@ -214,14 +214,14 @@ ul.task-tree {
     padding: 0rem;
 }
 
-#calendar-table {
+table {
     border-collapse: collapse;
     table-layout: fixed;
     font-size: 0.85rem;
 }
 
-    #calendar-table th,
-    #calendar-table td {
+    table th,
+    table td {
         border: 1px solid #ddd;
         text-align: center;
         white-space: nowrap;
@@ -231,59 +231,59 @@ ul.task-tree {
         vertical-align: middle;
     }
 
-        #calendar-table th.today {
+        table th.today {
             border: 3px #080 solid;
             background: #080d;
         }
 
-        #calendar-table td.today {
+        table td.today {
             border: 3px #080 solid;
         }
 
-        #calendar-table th.holiday {
+        table th.holiday {
             border: none;
             background: #a007;
             color: #fff;
         }
 
-        #calendar-table td.holiday {
+        table td.holiday {
             border: none;
             background: #a007;
         }
 
-        #calendar-table th.today.holiday {
+        table th.today.holiday {
             border: 3px #a00 solid;
             background: #a00d;
             color: #fff;
         }
 
-        #calendar-table td.today.holiday {
+        table td.today.holiday {
             border: 3px #a00 solid;
             background: #a007;
         }
 
     /* 狀態格顏色 */
-    #calendar-table .done-past {
+    table .done-past {
         background: #9f8e;
     }
 
-    #calendar-table .done-future {
+    table .done-future {
         background: #9f88;
         color: #0008;
         font-size: 0.8rem;
     }
 
-    #calendar-table .pending {
+    table .pending {
         background: #2322;
         color: #9f8;
     }
 
-    #calendar-table .overdue {
+    table .overdue {
         background: #0008;
         color: #f88;
     }
 
-    #calendar-table .normal {
+    table .normal {
         background: #8880;
     }
 
@@ -339,9 +339,9 @@ ul.task-tree {
     margin-left: 0.2rem;
 }
 
-.list-item button:hover {
-    background: #666;
-}
+    .list-item button:hover {
+        background: #666;
+    }
 
 /* 通用編輯視窗 */
 .editor {
@@ -358,18 +358,18 @@ ul.task-tree {
     width: 250px;
 }
 
-.editor label {
-    display: block;
-    margin-top: 0.5rem;
-    font-weight: bold;
-}
+    .editor label {
+        display: block;
+        margin-top: 0.5rem;
+        font-weight: bold;
+    }
 
-.editor input {
-    width: 100%;
-    padding: 0.3rem;
-    margin-top: 0.2rem;
-    box-sizing: border-box;
-}
+    .editor input {
+        width: 100%;
+        padding: 0.3rem;
+        margin-top: 0.2rem;
+        box-sizing: border-box;
+    }
 
 .editor-buttons {
     display: flex;
