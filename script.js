@@ -340,7 +340,7 @@ function toggleTaskCollapse(event) {
 
 // 3c.memo
 function addMemo() {
-    const newMemo = { text: "新備忘事項" };
+    const newMemo = { text: "新備忘事項", swatchId: 0 };
     memos.push(newMemo);
     renderMemoList();
     saveFile();
@@ -446,7 +446,7 @@ function openMemoEditor(memo, index) {
     document.querySelector(".task-editor")?.remove();
 
     const editor = document.createElement("div");
-    editor.className = "task-editor"; // 使用 task tree 的編輯器樣式
+    editor.className = "task-editor";
 
     const label = document.createElement("label");
     label.textContent = "備忘內容：";
@@ -454,6 +454,14 @@ function openMemoEditor(memo, index) {
     const input = document.createElement("input");
     input.type = "text";
     input.value = memo.text;
+
+    const labelColor = document.createElement("label");
+    labelColor.textContent = "底色：";
+    const swatchContainer = createColorSwatches(memo.swatchId, (btn, swatchId) => {
+        swatchContainer.querySelectorAll(".swatch").forEach(b => b.classList.remove("selected"));
+        btn.classList.add("selected");
+        memo.swatchId = swatchId;
+    });
 
     const saveBtn = document.createElement("button");
     saveBtn.textContent = "儲存";
@@ -468,7 +476,7 @@ function openMemoEditor(memo, index) {
     cancelBtn.textContent = "取消";
     cancelBtn.onclick = () => editor.remove();
 
-    editor.append(label, input, saveBtn, cancelBtn);
+    editor.append(label, input, labelColor, swatchContainer, saveBtn, cancelBtn);
     document.body.appendChild(editor);
 }
 function showToast(msg = "已儲存") {
@@ -653,25 +661,26 @@ function renderMemoList() {
 
     memos.forEach((memo, index) => {
         const li = document.createElement("li");
-        li.className = "task-node"; // 使用 task tree 的樣式
+        li.className = "task-node";
 
         const line = document.createElement("div");
-        line.className = "task-line"; // 使用 task tree 的樣式
+        line.className = "task-line";
+        line.style.background = colors[memo.swatchId] || "transparent";
 
         const textSpan = document.createElement("span");
         textSpan.textContent = memo.text;
-        textSpan.className = "task-title"; // 使用 task tree 的樣式
+        textSpan.className = "task-title";
 
         const editBtn = document.createElement("button");
         editBtn.className = "edit-btn";
         editBtn.title = "編輯備忘";
-        createFa("fa-pencil", editBtn); // 使用 Font Awesome 圖示
+        createFa("fa-pencil", editBtn);
         editBtn.onclick = () => openMemoEditor(memo, index);
 
         const deleteBtn = document.createElement("button");
         deleteBtn.className = "delete-btn";
         deleteBtn.title = "刪除備忘";
-        createFa("fa-trash", deleteBtn); // 使用 Font Awesome 圖示
+        createFa("fa-trash", deleteBtn);
         deleteBtn.onclick = () => deleteMemo(index);
 
         line.append(textSpan, editBtn, deleteBtn);
