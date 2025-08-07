@@ -128,19 +128,8 @@ async function saveFile() {
     refreshAll();
 
     if (fileHandle) {
-        const payload = {
-            tasks,
-            holidays: Array.from(holidayDates),
-            calendarRange: {
-                start: calendarStartDate ? formatDate(calendarStartDate) : null,
-                end: calendarEndDate ? formatDate(calendarEndDate) : null
-            },
-            memos,
-            lists // 直接存 array
-        };
-
         const w = await fileHandle.createWritable();
-        await w.write(JSON.stringify(payload, null, 2));
+        await w.write(JSON.stringify(getPayload(), null, 2));
         await w.close();
 
         showToast("已儲存");
@@ -148,12 +137,7 @@ async function saveFile() {
 }
 async function downloadFile() {
     sortDates();
-
-    const payload = {
-        tasks,
-        holidays: Array.from(holidayDates)
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+    const blob = new Blob([JSON.stringify(getPayload(), null, 2)], {
         type: "application/json"
     });
     const url = URL.createObjectURL(blob);
@@ -167,6 +151,18 @@ async function downloadFile() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     showToast("已下載");
+}
+function getPayload() {
+    return {
+        tasks,
+        holidays: Array.from(holidayDates),
+        calendarRange: {
+            start: calendarStartDate ? formatDate(calendarStartDate) : null,
+            end: calendarEndDate ? formatDate(calendarEndDate) : null
+        },
+        memos,
+        lists // 直接存 array
+    };
 }
 
 // 3a. Date
