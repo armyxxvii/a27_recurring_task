@@ -583,7 +583,7 @@ function showToast(msg = "已儲存") {
     setTimeout(() => toast.classList.remove("show"), 2000);
 }
 
-// 4a. Render
+// 4a. Render utility
 function refreshAll() {
     today = parseDate(new Date());
     buildIdMap(tasks);
@@ -599,14 +599,45 @@ function createFa(iconClass, parentElement) {
     parentElement.appendChild(icon);
 }
 
-// 4b. Render task tree
+// 4b. Render
 function renderTreeRoot() {
     clearChildren(treeRoot);
 
+    // 新增開關按鈕
+    const toggleSortableBtn = document.createElement("button");
+    toggleSortableBtn.className = "full-width-btn";
+    toggleSortableBtn.textContent = "啟用排序";
+    toggleSortableBtn.type = "button";
+    toggleSortableBtn.dataset.enabled = "false"; // 初始為禁用狀態
+    toggleSortableBtn.onclick = () => {
+        const isEnabled = toggleSortableBtn.dataset.enabled === "true";
+        toggleSortableBtn.dataset.enabled = isEnabled ? "false" : "true";
+        toggleSortableBtn.textContent = isEnabled ? "啟用排序" : "禁用排序";
+
+        // 切換按鈕顏色
+        toggleSortableBtn.classList.toggle("enabled", !isEnabled);
+
+        // 切換 Sortable 的啟用狀態
+        const ul = treeRoot.querySelector("ul.task-tree");
+        if (ul && ul.sortableInstance) {
+            ul.sortableInstance.option("disabled", isEnabled);
+        }
+
+        // 切換游標樣式
+        const taskTitles = treeRoot.querySelectorAll(".task-title");
+        taskTitles.forEach(title => {
+            title.style.cursor = isEnabled ? "default" : "move";
+        });
+    };
+
+    treeRoot.appendChild(toggleSortableBtn);
+
+    // 渲染任務樹
     renderTree(tasks, treeRoot);
 
+    // 新增 "新增任務" 按鈕
     const rootAddBtn = document.createElement("button");
-    rootAddBtn.className = "add-new-btn";
+    rootAddBtn.className = "full-width-btn";
     rootAddBtn.textContent = "➕ 新增任務";
     rootAddBtn.type = "button";
     rootAddBtn.onpointerdown = () => {
@@ -669,9 +700,11 @@ function renderTree(data, parentEl, path = []) {
         ul.appendChild(li);
     });
 
-    new Sortable(ul, {
+    // 初始化 Sortable 並默認禁用
+    const sortableInstance = new Sortable(ul, {
         animation: 150,
         handle: ".task-title",
+        disabled: true, // 默認禁用
         onEnd(evt) {
             const li = evt.item.closest(".task-node");
             const parentPath = li.dataset.path.split(",").map(n => +n);
@@ -684,10 +717,11 @@ function renderTree(data, parentEl, path = []) {
         }
     });
 
+    // 將 Sortable 實例存儲在 ul 上
+    ul.sortableInstance = sortableInstance;
+
     parentEl.appendChild(ul);
 }
-
-// 4c. Render calendar grid
 function renderCalendar() {
     clearChildren(dateHead);
     clearChildren(calBody);
@@ -752,8 +786,6 @@ function renderCalendar() {
     });
     calBody.appendChild(bodyFrag);
 }
-
-// 4d. Render memo
 function renderMemos() {
     clearChildren(memoList);
     clearChildren(memoroot);
@@ -794,7 +826,7 @@ function renderMemos() {
 
     // 新增按鈕（ul之後）
     const addBtn = document.createElement("button");
-    addBtn.className = "add-new-btn";
+    addBtn.className = "full-width-btn";
     addBtn.type = "button";
     addBtn.textContent = "➕ 新增備忘";
     addBtn.onclick = () => openMemoEditor();
@@ -802,7 +834,6 @@ function renderMemos() {
     memoroot.appendChild(ul);
     memoroot.appendChild(addBtn);
 }
-
 function renderLists() {
     clearChildren(listContainer);
     clearChildren(listroot);
@@ -882,7 +913,7 @@ function renderLists() {
 
     // 新增按鈕（ul之後）
     const addBtn = document.createElement("button");
-    addBtn.className = "add-new-btn";
+    addBtn.className = "full-width-btn";
     addBtn.type = "button";
     addBtn.textContent = "➕ 新增清單";
     addBtn.onclick = () => openListEditor();

@@ -93,6 +93,22 @@ h6 {
     flex-wrap: wrap;
 }
 
+/* 全寬度按鈕 */
+.full-width-btn {
+    height: 23px;
+    width: -webkit-fill-available;
+    margin: 1px 1px 1px 1rem;
+}
+
+    .full-width-btn.enabled {
+        background: #a00;
+    }
+    .full-width-btn.enabled:hover {
+        background: #f44336;
+        color: white;
+    }
+
+
 /* 共用捲軸區域 */
 .scroll-sync {
     display: flex;
@@ -140,17 +156,10 @@ ul.task-tree {
 .task-title {
     font-size: 0.8rem;
     flex: 1;
-    cursor: move;
+    cursor: default;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-}
-
-/* 底部新增按鈕 */
-.add-new-btn {
-    height: 25px;
-    width: -webkit-fill-available;
-    margin-left: 1rem;
 }
 
 /* 任務編輯視窗 */
