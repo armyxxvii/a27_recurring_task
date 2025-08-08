@@ -119,11 +119,16 @@ async function loadFile(file) {
 
     currentFilename = file.name || currentFilename;
     refreshAll();
-    renderMemos();
-    renderLists();
     showToast("已載入");
 }
 async function saveFile() {
+    // 為沒有 ID 的 list 補充隨機 ID
+    lists.forEach(list => {
+        if (!list.id) {
+            list.id = generateUniqueId();
+        }
+    });
+
     sortDates();
     refreshAll();
 
@@ -352,7 +357,6 @@ function toggleTaskCollapse(event) {
 function deleteMemo(index) {
     if (confirm("確定要刪除這個備忘事項？")) {
         memos.splice(index, 1);
-        renderMemos();
         saveFile();
     }
 }
@@ -363,17 +367,14 @@ function toggleListItem(list, number) {
     } else {
         list.doneNumbers.push(number);
     }
-    renderLists();
     saveFile();
 }
 function clearListDone(list) {
     list.doneNumbers = [];
-    renderLists();
     saveFile();
 }
 function deleteList(id) {
     lists = lists.filter(list => list.id !== id);
-    renderLists();
     saveFile();
 }
 
@@ -498,7 +499,6 @@ function openMemoEditor(memo, index) {
     saveBtn.onclick = () => {
         memo.text = input.value.trim() || "（未命名）";
         if (isNew) memos.push(memo);
-        renderMemos();
         saveFile();
         editor.remove();
     };
@@ -517,6 +517,7 @@ function openListEditor(list) {
 
     const isNew = !list;
     list = list || {
+        id: generateUniqueId(),
         name: "",
         startNumber: 1,
         endNumber: 10,
@@ -563,7 +564,6 @@ function openListEditor(list) {
         list.startNumber = +inputStart.value || 1;
         list.endNumber = +inputEnd.value || 10;
         if (isNew) lists.push(list);
-        renderLists();
         saveFile();
         editor.remove();
     };
@@ -585,10 +585,29 @@ function showToast(msg = "已儲存") {
 
 // 4a. Render utility
 function refreshAll() {
+    // 記錄所有可滾動元素的捲軸位置
+    const scrollPositions = new Map();
+    document.querySelectorAll("[data-scrollable]").forEach(el => {
+        scrollPositions.set(el.id, el.scrollLeft);
+    });
+
+    // 執行刷新邏輯
     today = parseDate(new Date());
     buildIdMap(tasks);
     renderTreeRoot();
     renderCalendar();
+    renderMemos();
+    renderLists();
+
+    // 恢復所有可滾動元素的捲軸位置
+    document.querySelectorAll("[data-scrollable]").forEach(el => {
+        if (scrollPositions.has(el.id)) {
+            el.scrollLeft = scrollPositions.get(el.id);
+        }
+    });
+}
+function generateUniqueId() {
+    return `list-${Math.random().toString(36).substr(2, 9)}`;
 }
 function clearChildren(parent) {
     while (parent.firstChild) parent.removeChild(parent.firstChild);
@@ -847,67 +866,14 @@ function renderLists() {
         const li = document.createElement("li");
         li.className = "task-node";
 
-        // 標題列（含操作按鈕）
-        const titleRow = document.createElement("div");
-        titleRow.style.display = "flex";
-        titleRow.style.alignItems = "center";
-        titleRow.style.justifyContent = "space-between";
-        titleRow.style.marginBottom = "0.2rem";
+        // 渲染標題列
+        const titleRow = createListTitleRow(list);
+        li.appendChild(titleRow);
 
-        const title = document.createElement("span");
-        title.textContent = list.name;
-        title.className = "task-title";
+        // 渲染表格
+        const tableDiv = createListTable(list);
+        li.appendChild(tableDiv);
 
-        const btnBar = document.createElement("span");
-        btnBar.style.display = "flex";
-        btnBar.style.gap = "0.3rem";
-
-        const editBtn = document.createElement("button");
-        editBtn.className = "edit-btn";
-        editBtn.title = "編輯清單";
-        createFa("fa-pencil", editBtn);
-        editBtn.onclick = () => openListEditor(list);
-
-        const clearBtn = document.createElement("button");
-        clearBtn.className = "clear-btn";
-        clearBtn.title = "清除所有完成";
-        createFa("fa-eraser", clearBtn);
-        clearBtn.onclick = () => clearListDone(list);
-
-        const deleteBtn = document.createElement("button");
-        deleteBtn.className = "delete-btn";
-        deleteBtn.title = "刪除清單";
-        createFa("fa-trash", deleteBtn);
-        deleteBtn.onclick = () => deleteList(list.id);
-
-        btnBar.append(editBtn, clearBtn, deleteBtn);
-        titleRow.append(title, btnBar);
-
-        // table
-        const tableDiv = document.createElement("div");
-        tableDiv.className = "calendar-column";
-
-        const table = document.createElement("table");
-        table.className = "calendar-table";
-        table.style.marginBottom = "0.5rem";
-        table.style.width = "auto";
-        table.style.background = colors[list.swatchId] || "transparent";
-
-        const tbody = document.createElement("tbody");
-        const trBody = document.createElement("tr");
-        for (let i = list.startNumber; i <= list.endNumber; i++) {
-            const td = document.createElement("td");
-            td.textContent = i;
-            td.className = list.doneNumbers.includes(i) ? "done-past" : "normal";
-            td.style.cursor = "pointer";
-            td.onclick = () => toggleListItem(list, i);
-            trBody.appendChild(td);
-        }
-        tbody.appendChild(trBody);
-        table.appendChild(tbody);
-        tableDiv.append(table);
-
-        li.append(titleRow, tableDiv);
         ul.appendChild(li);
     });
 
@@ -920,6 +886,83 @@ function renderLists() {
 
     listroot.appendChild(ul);
     listroot.appendChild(addBtn);
+}
+
+function createListTitleRow(list) {
+    // 創建標題列
+    const titleRow = document.createElement("div");
+    titleRow.style.display = "flex";
+    titleRow.style.alignItems = "center";
+    titleRow.style.justifyContent = "space-between";
+    titleRow.style.marginBottom = "0.2rem";
+
+    // 標題
+    const title = document.createElement("span");
+    title.textContent = list.name;
+    title.className = "task-title";
+
+    // 按鈕區
+    const btnBar = document.createElement("span");
+    btnBar.style.display = "flex";
+    btnBar.style.gap = "0.3rem";
+
+    // 編輯按鈕
+    const editBtn = document.createElement("button");
+    editBtn.className = "edit-btn";
+    editBtn.title = "編輯清單";
+    createFa("fa-pencil", editBtn);
+    editBtn.onclick = () => openListEditor(list);
+
+    // 清除已完成
+    const clearBtn = document.createElement("button");
+    clearBtn.className = "clear-btn";
+    clearBtn.title = "清除所有完成";
+    createFa("fa-eraser", clearBtn);
+    clearBtn.onclick = () => clearListDone(list);
+
+    // 刪除按鈕
+    const deleteBtn = document.createElement("button");
+    deleteBtn.className = "delete-btn";
+    deleteBtn.title = "刪除清單";
+    createFa("fa-trash", deleteBtn);
+    deleteBtn.onclick = () => deleteList(list.id);
+
+    btnBar.append(editBtn, clearBtn, deleteBtn);
+    titleRow.append(title, btnBar);
+
+    return titleRow;
+}
+
+function createListTable(list) {
+    // 創建表格容器
+    const tableDiv = document.createElement("div");
+    tableDiv.id = list.id;
+    tableDiv.className = "calendar-column";
+    tableDiv.setAttribute("data-scrollable", "");
+
+    // 表格
+    const table = document.createElement("table");
+    table.className = "calendar-table";
+    table.style.marginBottom = "0.5rem";
+    table.style.width = "auto";
+    table.style.background = colors[list.swatchId] || "transparent";
+
+    // 表體
+    const tbody = document.createElement("tbody");
+    const trBody = document.createElement("tr");
+    for (let j = list.startNumber; j <= list.endNumber; j++) {
+        const td = document.createElement("td");
+        td.textContent = j;
+        td.className = list.doneNumbers.includes(j) ? "done-past" : "normal";
+        td.style.cursor = "pointer";
+        td.onclick = () => toggleListItem(list, j);
+        trBody.appendChild(td);
+    }
+    tbody.appendChild(trBody);
+    table.appendChild(tbody);
+    tableDiv.append(table);
+
+    return tableDiv;
 }
 
 // 5. Event delegation
