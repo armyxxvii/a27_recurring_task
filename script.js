@@ -1,8 +1,8 @@
 ﻿// 1. DOM nodes & global state
-const applyRangeBtn = document.getElementById("apply-range-btn");
 const treeRoot = document.getElementById("task-tree-root");
-const calTable = document.getElementById("calendar-table");
 const dateHead = document.getElementById("date-header");
+const calStart = document.getElementById("calendar-start");
+const calEnd = document.getElementById("calendar-end");
 const calBody = document.getElementById("calendar-body");
 const toast = document.getElementById("save-toast");
 const listroot = document.getElementById("list-root");
@@ -91,9 +91,9 @@ async function loadFile(file) {
 
     if (data.calendarRange) {
         calendarStartDate = data.calendarRange.start ? parseDate(data.calendarRange.start) : null;
-        document.getElementById("calendar-start").value = data.calendarRange.start;
+        calStart.value = data.calendarRange.start;
         calendarEndDate = data.calendarRange.end ? parseDate(data.calendarRange.end) : null;
-        document.getElementById("calendar-end").value = data.calendarRange.end;
+        calEnd.value = data.calendarRange.end;
     }
 
     if (Array.isArray(data.tasks)) {
@@ -169,6 +169,20 @@ function getPayload() {
         lists // 直接存 array
     };
 }
+/**
+ * 生成當前狀態的快照
+ * @returns {Object} 當前狀態的深拷貝
+ */
+function getCurrentState() {
+    return {
+        tasks: JSON.parse(JSON.stringify(tasks)),
+        lists: JSON.parse(JSON.stringify(lists)),
+        memos: JSON.parse(JSON.stringify(memos)),
+        holidayDates: new Set(holidayDates),
+        calendarStartDate,
+        calendarEndDate
+    };
+}
 
 // 3a. Date
 function formatDate(d) {
@@ -222,13 +236,10 @@ function generateDates() {
     return result;
 }
 function updateDateRange() {
-    const startInput = document.getElementById("calendar-start").value;
-    const endInput = document.getElementById("calendar-end").value;
-
-    calendarStartDate = startInput ? parseDate(startInput) : null;
-    calendarEndDate = endInput ? parseDate(endInput) : null;
-
-    saveFile();
+    execute(() => {
+        calendarStartDate = calStart.value ? parseDate(calStart.value) : null;
+        calendarEndDate = calEnd.value ? parseDate(calEnd.value) : null;
+    });
 }
 function toggleHoliday(event) {
     const th = event.target.closest("th[data-date]");
@@ -237,10 +248,10 @@ function toggleHoliday(event) {
     const ds = th?.dataset?.date;
     if (!ds) return;
 
-    if (holidayDates.has(ds)) holidayDates.delete(ds);
-    else holidayDates.add(ds);
-
-    saveFile();
+    execute(() => {
+        if (holidayDates.has(ds)) holidayDates.delete(ds);
+        else holidayDates.add(ds);
+    });
 }
 async function toggleComplete(event) {
     const td = event.target.closest("td[data-id]");
@@ -251,15 +262,15 @@ async function toggleComplete(event) {
     const found = idMap.get(id);
     if (!found) return;
 
-    // 切換完成狀態
-    const i = found.completionDates.indexOf(date);
-    if (i >= 0) {
-        found.completionDates.splice(i, 1);
-    } else {
-        found.completionDates.push(date);
-    }
-
-    await saveFile();
+    execute(() => {
+        // 切換完成狀態
+        const i = found.completionDates.indexOf(date);
+        if (i >= 0) {
+            found.completionDates.splice(i, 1);
+        } else {
+            found.completionDates.push(date);
+        }
+    });
 }
 
 // 3b. Tasks
@@ -334,11 +345,11 @@ function toggleTaskCollapse(event) {
 
     const path = li.dataset.path.split(",").map(Number);
     const { task } = getTaskByPath(path);
-    let modified = false;
 
     if (event.target.matches(".toggle-btn")) {
-        task.collapsed = !task.collapsed;
-        modified = true;
+        execute(() => {
+            task.collapsed = !task.collapsed;
+        });
     }
     else if (event.target.matches(".add-child-btn")) {
         if (!Array.isArray(task.children)) {
@@ -349,36 +360,38 @@ function toggleTaskCollapse(event) {
     else if (event.target.matches(".edit-btn")) {
         openTaskEditor(task);
     }
-
-    if (modified) saveFile();
 };
 
 // 3c. Memo
 function deleteMemo(index) {
     if (confirm("確定要刪除這個備忘事項？")) {
-        memos.splice(index, 1);
-        saveFile();
+        execute(() => {
+            memos.splice(index, 1);
+        });
     }
 }
 function toggleListItem(list, number) {
-    const idx = list.doneNumbers.indexOf(number);
-    if (idx >= 0) {
-        list.doneNumbers.splice(idx, 1);
-    } else {
-        list.doneNumbers.push(number);
-    }
-    saveFile();
+    execute(() => {
+        const idx = list.doneNumbers.indexOf(number);
+        if (idx >= 0) {
+            list.doneNumbers.splice(idx, 1);
+        } else {
+            list.doneNumbers.push(number);
+        }
+    });
 }
 function clearListDone(list) {
-    list.doneNumbers = [];
-    saveFile();
+    execute(() => {
+        list.doneNumbers = [];
+    });
 }
 function deleteList(id) {
-    lists = lists.filter(list => list.id !== id);
-    saveFile();
+    execute(() => {
+        lists = lists.filter(list => list.id !== id);
+    });
 }
 
-// 3c. Window
+// 3d. Window
 function openTaskEditor(task, parentArray = null) {
     document.querySelector("#task-editor")?.remove();
 
@@ -433,20 +446,24 @@ function openTaskEditor(task, parentArray = null) {
     document.body.appendChild(editor);
 
     saveBtn.onpointerdown = () => {
-        task.title = inputTitle.value.trim() || "（未命名）";
-        task.intervalDays = +inputInterval.value || 0;
-        if (parentArray) parentArray.push(task);
-        saveFile();
+        execute(() => {
+            task.title = inputTitle.value.trim() || "（未命名）";
+            task.intervalDays = +inputInterval.value || 0;
+            if (parentArray) parentArray.push(task);
+        });
+
         editor.remove();
     };
     cancelBtn.onpointerdown = () => editor.remove();
     if (!parentArray) {
         editor.querySelector("#delete-task").onpointerdown = () => {
             if (confirm("確定要刪除這個任務？")) {
-                const path = findTaskPath(task);
-                const { parent, index } = getTaskByPath(path);
-                parent.splice(index, 1);
-                saveFile();
+                execute(() => {
+                    const path = findTaskPath(task);
+                    const { parent, index } = getTaskByPath(path);
+                    parent.splice(index, 1);
+                });
+
                 editor.remove();
             }
         };
@@ -497,9 +514,10 @@ function openMemoEditor(memo, index) {
     const saveBtn = document.createElement("button");
     saveBtn.textContent = "儲存";
     saveBtn.onclick = () => {
-        memo.text = input.value.trim() || "（未命名）";
-        if (isNew) memos.push(memo);
-        saveFile();
+        execute(() => {
+            memo.text = input.value.trim() || "（未命名）";
+            if (isNew) memos.push(memo);
+        });
         editor.remove();
     };
 
@@ -560,11 +578,12 @@ function openListEditor(list) {
     const saveBtn = document.createElement("button");
     saveBtn.textContent = "儲存";
     saveBtn.onclick = () => {
-        list.name = inputName.value.trim() || "未命名清單";
-        list.startNumber = +inputStart.value || 1;
-        list.endNumber = +inputEnd.value || 10;
-        if (isNew) lists.push(list);
-        saveFile();
+        execute(() => {
+            list.name = inputName.value.trim() || "未命名清單";
+            list.startNumber = +inputStart.value || 1;
+            list.endNumber = +inputEnd.value || 10;
+            if (isNew) lists.push(list);
+        });
         editor.remove();
     };
 
@@ -662,7 +681,6 @@ function renderTreeRoot() {
     rootAddBtn.onpointerdown = () => {
         const t = newTask();
         openTaskEditor(t, tasks);
-        saveFile();
     };
     treeRoot.appendChild(rootAddBtn);
 }
@@ -725,14 +743,14 @@ function renderTree(data, parentEl, path = []) {
         handle: ".task-title",
         disabled: true, // 默認禁用
         onEnd(evt) {
-            const li = evt.item.closest(".task-node");
-            const parentPath = li.dataset.path.split(",").map(n => +n);
-            const { parent } = getTaskByPath(parentPath);
+            execute(() => {
+                const li = evt.item.closest(".task-node");
+                const parentPath = li.dataset.path.split(",").map(n => +n);
+                const { parent } = getTaskByPath(parentPath);
 
-            const moved = parent.splice(evt.oldIndex, 1)[0];
-            parent.splice(evt.newIndex, 0, moved);
-
-            saveFile();
+                const moved = parent.splice(evt.oldIndex, 1)[0];
+                parent.splice(evt.newIndex, 0, moved);
+            });
         }
     });
 
@@ -968,6 +986,76 @@ function createListTable(list) {
 // 5. Event delegation
 document.addEventListener("DOMContentLoaded", checkFileSystemSupport);
 dateHead.addEventListener("click", toggleHoliday);
-applyRangeBtn.addEventListener("click", updateDateRange);
 treeRoot.addEventListener("click", toggleTaskCollapse);
-calTable.addEventListener("click", toggleComplete);
+document.getElementById("apply-range-btn").addEventListener("click", updateDateRange);
+document.getElementById("calendar-table").addEventListener("click", toggleComplete);
+document.getElementById("undo-btn").addEventListener("click", undo);
+document.getElementById("redo-btn").addEventListener("click", redo);
+
+// 撤銷 / 重做
+const undoStack = [];
+const redoStack = [];
+
+function saveState() {
+    undoStack.push(getCurrentState());
+    redoStack.length = 0;
+}
+function undo() {
+    if (undoStack.length === 0) {
+        showToast("無法撤銷");
+        return;
+    }
+
+    const previousState = undoStack.pop();
+    const currentState = {
+        tasks: JSON.parse(JSON.stringify(tasks)),
+        lists: JSON.parse(JSON.stringify(lists)),
+        memos: JSON.parse(JSON.stringify(memos)),
+        holidayDates: new Set(holidayDates),
+        calendarStartDate,
+        calendarEndDate
+    };
+    redoStack.push(currentState); // 將當前狀態存入 redoStack
+
+    // 恢復到上一個狀態
+    tasks = previousState.tasks;
+    lists = previousState.lists;
+    memos = previousState.memos;
+    holidayDates.clear();
+    previousState.holidayDates.forEach(date => holidayDates.add(date));
+    calendarStartDate = previousState.calendarStartDate;
+    calendarEndDate = previousState.calendarEndDate;
+
+    refreshAll();
+    showToast("已撤銷");
+}
+function redo() {
+    if (redoStack.length === 0) {
+        showToast("無法重做");
+        return;
+    }
+
+    const nextState = redoStack.pop();
+    undoStack.push(getCurrentState()); // 使用通用函式生成當前狀態
+
+    // 恢復到下一個狀態
+    tasks = nextState.tasks;
+    lists = nextState.lists;
+    memos = nextState.memos;
+    holidayDates.clear();
+    nextState.holidayDates.forEach(date => holidayDates.add(date));
+    calendarStartDate = nextState.calendarStartDate;
+    calendarEndDate = nextState.calendarEndDate;
+
+    refreshAll();
+    showToast("已重做");
+}
+/**
+ * 通用函式：保存狀態、執行功能並保存文件
+ * @param {Function} action - 要執行的功能（回呼函式）
+ */
+function execute(action) {
+    saveState(); // 保存狀態
+    action();    // 執行指定的功能
+    saveFile();  // 保存文件
+}
