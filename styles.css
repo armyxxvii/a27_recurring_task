@@ -25,8 +25,7 @@ button i {
 
     .container button,
     .container input {
-        font-size: 0.8rem;
-        padding: 0.1rem;
+        padding: 0.1rem 0.4rem;
         color: #fff;
         background: #8b8b8b;
         border: none;
@@ -50,6 +49,14 @@ button i {
     .title-bar small {
         font-size: 0.8rem;
     }
+
+.indent {
+    margin-left: 0.5rem;
+}
+
+.outdent {
+    margin-left: -0.5rem;
+}
 
 h1 {
     font-size: 1.3rem;
@@ -97,16 +104,18 @@ h6 {
 .full-width-btn {
     height: 23px;
     width: -webkit-fill-available;
-    margin: 1px 1px 1px 1rem;
+    margin-top: 1px;
+    margin-bottom: 1px;
 }
 
     .full-width-btn.enabled {
         background: #a00;
     }
-    .full-width-btn.enabled:hover {
-        background: #f44336;
-        color: white;
-    }
+
+        .full-width-btn.enabled:hover {
+            background: #f44336;
+            color: white;
+        }
 
 
 /* 共用捲軸區域 */
@@ -120,14 +129,13 @@ h6 {
     flex-shrink: 0;
     width: 50%;
     max-width: 220px;
-    margin-left: -1rem;
     padding: 2px 0 0 0;
     border: none;
 }
 
 ul.task-tree {
     list-style: none;
-    padding-left: 1rem;
+    padding-left: 0.5rem;
     margin: 0;
 }
 
@@ -135,6 +143,7 @@ ul.task-tree {
     width: 1rem;
     height: 1rem;
     font-size: 0.6rem;
+    padding: 0.1rem;
     margin: 0.1rem;
 }
 

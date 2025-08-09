@@ -643,7 +643,7 @@ function renderTreeRoot() {
 
     // 新增開關按鈕
     const toggleSortableBtn = document.createElement("button");
-    toggleSortableBtn.className = "full-width-btn";
+    toggleSortableBtn.className = "indent full-width-btn";
     toggleSortableBtn.textContent = "啟用排序";
     toggleSortableBtn.type = "button";
     toggleSortableBtn.dataset.enabled = "false"; // 初始為禁用狀態
@@ -675,7 +675,7 @@ function renderTreeRoot() {
 
     // 新增 "新增任務" 按鈕
     const rootAddBtn = document.createElement("button");
-    rootAddBtn.className = "full-width-btn";
+    rootAddBtn.className = "indent full-width-btn";
     rootAddBtn.textContent = "➕ 新增任務";
     rootAddBtn.type = "button";
     rootAddBtn.onpointerdown = () => {
@@ -863,7 +863,7 @@ function renderMemos() {
 
     // 新增按鈕（ul之後）
     const addBtn = document.createElement("button");
-    addBtn.className = "full-width-btn";
+    addBtn.className = "indent full-width-btn";
     addBtn.type = "button";
     addBtn.textContent = "➕ 新增備忘";
     addBtn.onclick = () => openMemoEditor();
@@ -897,7 +897,7 @@ function renderLists() {
 
     // 新增按鈕（ul之後）
     const addBtn = document.createElement("button");
-    addBtn.className = "full-width-btn";
+    addBtn.className = "indent full-width-btn";
     addBtn.type = "button";
     addBtn.textContent = "➕ 新增清單";
     addBtn.onclick = () => openListEditor();
@@ -909,10 +909,7 @@ function renderLists() {
 function createListTitleRow(list) {
     // 創建標題列
     const titleRow = document.createElement("div");
-    titleRow.style.display = "flex";
-    titleRow.style.alignItems = "center";
-    titleRow.style.justifyContent = "space-between";
-    titleRow.style.marginBottom = "0.2rem";
+    titleRow.className = "task-line";
 
     // 標題
     const title = document.createElement("span");
@@ -921,8 +918,7 @@ function createListTitleRow(list) {
 
     // 按鈕區
     const btnBar = document.createElement("span");
-    btnBar.style.display = "flex";
-    btnBar.style.gap = "0.3rem";
+    btnBar.className = "controls";
 
     // 編輯按鈕
     const editBtn = document.createElement("button");
@@ -961,8 +957,6 @@ function createListTable(list) {
     // 表格
     const table = document.createElement("table");
     table.className = "calendar-table";
-    table.style.marginBottom = "0.5rem";
-    table.style.width = "auto";
     table.style.background = colors[list.swatchId] || "transparent";
 
     // 表體

@@ -26,29 +26,29 @@
         <input type="date" id="calendar-end" title="選擇結束日期">
         <button type="button" id="apply-range-btn">套用</button>
     </div>
-    <div class="container">
-        <div class="scroll-sync">
-            <!-- 左欄：任務樹 -->
-            <div class="tree-column">
-                <div id="task-tree-root"></div>
-            </div>
+    <div class="container scroll-sync">
+        <!-- 左欄：任務樹 -->
+        <div id="task-tree-root" class="outdent tree-column"></div>
 
-            <!-- 右欄：行事曆格子 -->
-            <div id="calendar-column" class="calendar-column" data-scrollable>
-                <table id="calendar-table">
-                    <thead><tr id="date-header"></tr></thead>
-                    <tbody id="calendar-body"></tbody>
-                </table>
-            </div>
+        <!-- 右欄：行事曆格子 -->
+        <div id="calendar-column" class="calendar-column" data-scrollable>
+            <table id="calendar-table">
+                <thead><tr id="date-header"></tr></thead>
+                <tbody id="calendar-body"></tbody>
+            </table>
         </div>
     </div>
-    <div id="list-root" class="container">
-        <!--<h2>清單</h2>-->
-        <ul id="list-container" class="task-tree"></ul>
+    <!-- 清單 -->
+    <div class="container">
+        <div id="list-root" class="outdent">
+            <ul id="list-container" class="task-tree"></ul>
+        </div>
     </div>
-    <div id="memo-root" class="container">
-        <!--<h2>備忘</h2>-->
-        <ul id="memo-list" class="task-tree"></ul>
+    <!-- 備忘 -->
+    <div class="container">
+        <div id="memo-root" class="outdent">
+            <ul id="memo-list" class="task-tree"></ul>
+        </div>
     </div>
 
     <div id="save-toast">已儲存</div>
