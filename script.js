@@ -10,6 +10,9 @@ const listContainer = document.getElementById("list-container");
 const memoroot = document.getElementById("memo-root");
 const memoList = document.getElementById("memo-list");
 
+const undoStack = [];
+const redoStack = [];
+
 const holidayDates = new Set();
 const farFuture = "2700-02-27";
 const dayMS = 1000 * 60 * 60 * 24;
@@ -30,14 +33,18 @@ const colors = [
 const idMap = new Map();
 
 let tasks = [];
+let lists = [];
+let memos = [];
+
 let fileHandle = null;
 let currentFilename = "tasks.json";
 let downloadBtn = null;
 let today;
 let calendarStartDate = null;
 let calendarEndDate = null;
-let lists = [];
-let memos = [];
+
+let toggleSortableBtn;
+let isSortableEnabled = false;
 
 // 2. File I/O: open, save
 function checkFileSystemSupport() {
@@ -169,10 +176,8 @@ function getPayload() {
         lists // 直接存 array
     };
 }
-/**
- * 生成當前狀態的快照
- * @returns {Object} 當前狀態的深拷貝
- */
+
+// 撤銷 / 重做
 function getCurrentState() {
     return {
         tasks: JSON.parse(JSON.stringify(tasks)),
@@ -182,6 +187,61 @@ function getCurrentState() {
         calendarStartDate,
         calendarEndDate
     };
+}
+function saveState() {
+    undoStack.push(getCurrentState());
+    redoStack.length = 0;
+}
+function undo() {
+    if (undoStack.length === 0) {
+        showToast("無法撤銷");
+        return;
+    }
+
+    const previousState = undoStack.pop();
+    redoStack.push(getCurrentState());
+
+    // 恢復到上一個狀態
+    tasks = previousState.tasks;
+    lists = previousState.lists;
+    memos = previousState.memos;
+    holidayDates.clear();
+    previousState.holidayDates.forEach(date => holidayDates.add(date));
+    calendarStartDate = previousState.calendarStartDate;
+    calendarEndDate = previousState.calendarEndDate;
+
+    showToast("已撤銷");
+    saveFile();
+}
+function redo() {
+    if (redoStack.length === 0) {
+        showToast("無法重做");
+        return;
+    }
+
+    const nextState = redoStack.pop();
+    undoStack.push(getCurrentState()); // 使用通用函式生成當前狀態
+
+    // 恢復到下一個狀態
+    tasks = nextState.tasks;
+    lists = nextState.lists;
+    memos = nextState.memos;
+    holidayDates.clear();
+    nextState.holidayDates.forEach(date => holidayDates.add(date));
+    calendarStartDate = nextState.calendarStartDate;
+    calendarEndDate = nextState.calendarEndDate;
+
+    showToast("已重做");
+    saveFile();
+}
+/**
+ * 通用函式：保存狀態、執行功能並保存文件
+ * @param {Function} action - 要執行的功能（回呼函式）
+ */
+function execute(action) {
+    saveState();
+    action();
+    saveFile();
 }
 
 // 3a. Date
@@ -624,6 +684,12 @@ function refreshAll() {
             el.scrollLeft = scrollPositions.get(el.id);
         }
     });
+
+    // 更新游標樣式
+    const taskTitles = document.querySelectorAll(".task-title");
+    taskTitles.forEach(title => {
+        title.style.cursor = isSortableEnabled ? "move" : "default";
+    });
 }
 function generateUniqueId() {
     return `list-${Math.random().toString(36).substr(2, 9)}`;
@@ -636,39 +702,46 @@ function createFa(iconClass, parentElement) {
     icon.className = `fas ${iconClass}`;
     parentElement.appendChild(icon);
 }
+function refreshToggleSortableBtn() {
+    toggleSortableBtn.classList.toggle("enabled", isSortableEnabled);
+    toggleSortableBtn.dataset.enabled = isSortableEnabled ? "true" : "false";
+    toggleSortableBtn.textContent = isSortableEnabled ? "禁用排序" : "啟用排序";
+}
+function toggleSortable() {
+    // 更新全域變數
+    isSortableEnabled = !isSortableEnabled;
+
+    // 切換按鈕狀態
+    refreshToggleSortableBtn();
+
+    // 切換所有 Sortable 的啟用狀態
+    const sortableContainers = document.querySelectorAll(".task-tree");
+    sortableContainers.forEach(container => {
+        if (container.sortableInstance) {
+            container.sortableInstance.option("disabled", !isSortableEnabled);
+        }
+    });
+
+    // 切換游標樣式
+    const taskTitles = document.querySelectorAll(".task-title");
+    taskTitles.forEach(title => {
+        title.style.cursor = isSortableEnabled ? "move" : "default";
+    });
+}
 
 // 4b. Render
 function renderTreeRoot() {
     clearChildren(treeRoot);
 
     // 新增開關按鈕
-    const toggleSortableBtn = document.createElement("button");
-    toggleSortableBtn.className = "indent full-width-btn";
-    toggleSortableBtn.textContent = "啟用排序";
-    toggleSortableBtn.type = "button";
-    toggleSortableBtn.dataset.enabled = "false"; // 初始為禁用狀態
-    toggleSortableBtn.onclick = () => {
-        const isEnabled = toggleSortableBtn.dataset.enabled === "true";
-        toggleSortableBtn.dataset.enabled = isEnabled ? "false" : "true";
-        toggleSortableBtn.textContent = isEnabled ? "啟用排序" : "禁用排序";
-
-        // 切換按鈕顏色
-        toggleSortableBtn.classList.toggle("enabled", !isEnabled);
-
-        // 切換 Sortable 的啟用狀態
-        const ul = treeRoot.querySelector("ul.task-tree");
-        if (ul && ul.sortableInstance) {
-            ul.sortableInstance.option("disabled", isEnabled);
-        }
-
-        // 切換游標樣式
-        const taskTitles = treeRoot.querySelectorAll(".task-title");
-        taskTitles.forEach(title => {
-            title.style.cursor = isEnabled ? "default" : "move";
-        });
-    };
-
+    toggleSortableBtn = document.createElement("button");
+    toggleSortableBtn.onclick = () => toggleSortable();
     treeRoot.appendChild(toggleSortableBtn);
+    toggleSortableBtn.className = "indent full-width-btn";
+    toggleSortableBtn.type = "button";
+
+    refreshToggleSortableBtn();
+
 
     // 渲染任務樹
     renderTree(tasks, treeRoot);
@@ -737,11 +810,10 @@ function renderTree(data, parentEl, path = []) {
         ul.appendChild(li);
     });
 
-    // 初始化 Sortable 並默認禁用
-    const sortableInstance = new Sortable(ul, {
+    ul.sortableInstance = new Sortable(ul, {
         animation: 150,
         handle: ".task-title",
-        disabled: true, // 默認禁用
+        disabled: !isSortableEnabled,
         onEnd(evt) {
             execute(() => {
                 const li = evt.item.closest(".task-node");
@@ -753,9 +825,6 @@ function renderTree(data, parentEl, path = []) {
             });
         }
     });
-
-    // 將 Sortable 實例存儲在 ul 上
-    ul.sortableInstance = sortableInstance;
 
     parentEl.appendChild(ul);
 }
@@ -835,6 +904,7 @@ function renderMemos() {
     memos.forEach((memo, index) => {
         const li = document.createElement("li");
         li.className = "task-node";
+        li.dataset.index = index;
 
         const line = document.createElement("div");
         line.className = "task-line";
@@ -861,6 +931,18 @@ function renderMemos() {
         ul.appendChild(li);
     });
 
+    ul.sortableInstance = new Sortable(ul, {
+        animation: 150,
+        handle: ".task-title",
+        disabled: !isSortableEnabled,
+        onEnd(evt) {
+            execute(() => {
+                const moved = memos.splice(evt.oldIndex, 1)[0];
+                memos.splice(evt.newIndex, 0, moved);
+            });
+        }
+    });
+
     // 新增按鈕（ul之後）
     const addBtn = document.createElement("button");
     addBtn.className = "indent full-width-btn";
@@ -880,9 +962,10 @@ function renderLists() {
     ul.id = "list-container";
     ul.className = "task-tree";
 
-    lists.forEach(list => {
+    lists.forEach((list, index) => {
         const li = document.createElement("li");
         li.className = "task-node";
+        li.dataset.index = index;
 
         // 渲染標題列
         const titleRow = createListTitleRow(list);
@@ -895,6 +978,18 @@ function renderLists() {
         ul.appendChild(li);
     });
 
+    ul.sortableInstance = new Sortable(ul, {
+        animation: 150,
+        handle: ".task-title",
+        disabled: !isSortableEnabled,
+        onEnd(evt) {
+            execute(() => {
+                const moved = lists.splice(evt.oldIndex, 1)[0];
+                lists.splice(evt.newIndex, 0, moved);
+            });
+        }
+    });
+
     // 新增按鈕（ul之後）
     const addBtn = document.createElement("button");
     addBtn.className = "indent full-width-btn";
@@ -905,7 +1000,6 @@ function renderLists() {
     listroot.appendChild(ul);
     listroot.appendChild(addBtn);
 }
-
 function createListTitleRow(list) {
     // 創建標題列
     const titleRow = document.createElement("div");
@@ -946,7 +1040,6 @@ function createListTitleRow(list) {
 
     return titleRow;
 }
-
 function createListTable(list) {
     // 創建表格容器
     const tableDiv = document.createElement("div");
@@ -985,71 +1078,3 @@ document.getElementById("apply-range-btn").addEventListener("click", updateDateR
 document.getElementById("calendar-table").addEventListener("click", toggleComplete);
 document.getElementById("undo-btn").addEventListener("click", undo);
 document.getElementById("redo-btn").addEventListener("click", redo);
-
-// 撤銷 / 重做
-const undoStack = [];
-const redoStack = [];
-
-function saveState() {
-    undoStack.push(getCurrentState());
-    redoStack.length = 0;
-}
-function undo() {
-    if (undoStack.length === 0) {
-        showToast("無法撤銷");
-        return;
-    }
-
-    const previousState = undoStack.pop();
-    const currentState = {
-        tasks: JSON.parse(JSON.stringify(tasks)),
-        lists: JSON.parse(JSON.stringify(lists)),
-        memos: JSON.parse(JSON.stringify(memos)),
-        holidayDates: new Set(holidayDates),
-        calendarStartDate,
-        calendarEndDate
-    };
-    redoStack.push(currentState); // 將當前狀態存入 redoStack
-
-    // 恢復到上一個狀態
-    tasks = previousState.tasks;
-    lists = previousState.lists;
-    memos = previousState.memos;
-    holidayDates.clear();
-    previousState.holidayDates.forEach(date => holidayDates.add(date));
-    calendarStartDate = previousState.calendarStartDate;
-    calendarEndDate = previousState.calendarEndDate;
-
-    refreshAll();
-    showToast("已撤銷");
-}
-function redo() {
-    if (redoStack.length === 0) {
-        showToast("無法重做");
-        return;
-    }
-
-    const nextState = redoStack.pop();
-    undoStack.push(getCurrentState()); // 使用通用函式生成當前狀態
-
-    // 恢復到下一個狀態
-    tasks = nextState.tasks;
-    lists = nextState.lists;
-    memos = nextState.memos;
-    holidayDates.clear();
-    nextState.holidayDates.forEach(date => holidayDates.add(date));
-    calendarStartDate = nextState.calendarStartDate;
-    calendarEndDate = nextState.calendarEndDate;
-
-    refreshAll();
-    showToast("已重做");
-}
-/**
- * 通用函式：保存狀態、執行功能並保存文件
- * @param {Function} action - 要執行的功能（回呼函式）
- */
-function execute(action) {
-    saveState(); // 保存狀態
-    action();    // 執行指定的功能
-    saveFile();  // 保存文件
-}
