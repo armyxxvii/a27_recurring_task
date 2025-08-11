@@ -157,6 +157,18 @@ ul.task-tree {
     align-items: center;
     gap: 3px;
 }
+    .task-line .day-counter {
+        color: #fff;
+        background: #0005;
+        text-align: center;
+        display: inline-block;
+        height: 1rem;
+        width: 1rem;
+        font-size: 0.7rem;
+        border: 1px solid #444;
+        border-radius: 0.2rem;
+        line-height: 1rem;
+    }
 
 .task-node {
     display: block;

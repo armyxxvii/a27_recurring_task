@@ -785,7 +785,7 @@ function renderTree(data, parentEl, path = []) {
 
         const titleSpan = document.createElement("span");
         titleSpan.className = "task-title";
-        titleSpan.innerHTML = `<sup>${task.intervalDays}</sup> ${task.title}`;
+        titleSpan.innerHTML = `<span class="day-counter">${task.intervalDays}</span> ${task.title}`;
 
         const ctr = document.createElement("span");
         ctr.className = "controls";
