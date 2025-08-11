@@ -1,4 +1,6 @@
-﻿// 1. DOM nodes & global state
+﻿// ===========================
+// 1. DOM nodes & global state
+// ===========================
 const treeRoot = document.getElementById("task-tree-root");
 const dateHead = document.getElementById("date-header");
 const calStart = document.getElementById("calendar-start");
@@ -12,7 +14,6 @@ const memoList = document.getElementById("memo-list");
 
 const undoStack = [];
 const redoStack = [];
-
 const holidayDates = new Set();
 const farFuture = "2700-02-27";
 const dayMS = 1000 * 60 * 60 * 24;
@@ -35,18 +36,18 @@ const idMap = new Map();
 let tasks = [];
 let lists = [];
 let memos = [];
-
 let fileHandle = null;
 let currentFilename = "tasks.json";
 let downloadBtn = null;
 let today;
 let calendarStartDate = null;
 let calendarEndDate = null;
-
 let toggleSortableBtn;
 let isSortableEnabled = false;
 
+// ===========================
 // 2. File I/O: open, save
+// ===========================
 function checkFileSystemSupport() {
     const controls = document.getElementById("controls");
     clearChildren(controls);
@@ -92,9 +93,7 @@ async function loadFile(file) {
     let data = JSON.parse(text || "{}");
 
     const headerTitle = document.querySelector("header h1");
-    if (headerTitle) {
-        headerTitle.textContent = file.name;
-    }
+    if (headerTitle) headerTitle.textContent = file.name;
 
     if (data.calendarRange) {
         calendarStartDate = data.calendarRange.start ? parseDate(data.calendarRange.start) : null;
@@ -129,13 +128,9 @@ async function loadFile(file) {
     showToast("已載入");
 }
 async function saveFile() {
-    // 為沒有 ID 的 list 補充隨機 ID
     lists.forEach(list => {
-        if (!list.id) {
-            list.id = generateUniqueId();
-        }
+        if (!list.id) list.id = generateUniqueId();
     });
-
     sortDates();
     refreshAll();
 
@@ -143,21 +138,16 @@ async function saveFile() {
         const w = await fileHandle.createWritable();
         await w.write(JSON.stringify(getPayload(), null, 2));
         await w.close();
-
         showToast("已儲存");
     } else showToast("修改未儲存");
 }
 async function downloadFile() {
     sortDates();
-    const blob = new Blob([JSON.stringify(getPayload(), null, 2)], {
-        type: "application/json"
-    });
+    const blob = new Blob([JSON.stringify(getPayload(), null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = currentFilename.endsWith(".json")
-        ? currentFilename
-        : `${currentFilename}.json`;
+    a.download = currentFilename.endsWith(".json") ? currentFilename : `${currentFilename}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -173,11 +163,13 @@ function getPayload() {
             end: calendarEndDate ? formatDate(calendarEndDate) : null
         },
         memos,
-        lists // 直接存 array
+        lists
     };
 }
 
+// ===========================
 // 撤銷 / 重做
+// ===========================
 function getCurrentState() {
     return {
         tasks: JSON.parse(JSON.stringify(tasks)),
@@ -197,11 +189,8 @@ function undo() {
         showToast("無法撤銷");
         return;
     }
-
     const previousState = undoStack.pop();
     redoStack.push(getCurrentState());
-
-    // 恢復到上一個狀態
     tasks = previousState.tasks;
     lists = previousState.lists;
     memos = previousState.memos;
@@ -209,7 +198,6 @@ function undo() {
     previousState.holidayDates.forEach(date => holidayDates.add(date));
     calendarStartDate = previousState.calendarStartDate;
     calendarEndDate = previousState.calendarEndDate;
-
     showToast("已撤銷");
     saveFile();
 }
@@ -218,11 +206,8 @@ function redo() {
         showToast("無法重做");
         return;
     }
-
     const nextState = redoStack.pop();
-    undoStack.push(getCurrentState()); // 使用通用函式生成當前狀態
-
-    // 恢復到下一個狀態
+    undoStack.push(getCurrentState());
     tasks = nextState.tasks;
     lists = nextState.lists;
     memos = nextState.memos;
@@ -230,21 +215,19 @@ function redo() {
     nextState.holidayDates.forEach(date => holidayDates.add(date));
     calendarStartDate = nextState.calendarStartDate;
     calendarEndDate = nextState.calendarEndDate;
-
     showToast("已重做");
     saveFile();
 }
-/**
- * 通用函式：保存狀態、執行功能並保存文件
- * @param {Function} action - 要執行的功能（回呼函式）
- */
+/** 通用函式：保存狀態、執行功能並保存文件 */
 function execute(action) {
     saveState();
     action();
     saveFile();
 }
 
+// ===========================
 // 3a. Date
+// ===========================
 function formatDate(d) {
     const yy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -252,9 +235,7 @@ function formatDate(d) {
     return `${yy}-${mm}-${dd}`;
 }
 function parseDate(input) {
-    if (input instanceof Date) {
-        return new Date(input.getFullYear(), input.getMonth(), input.getDate());
-    }
+    if (input instanceof Date) return new Date(input.getFullYear(), input.getMonth(), input.getDate());
     if (typeof input === "string") {
         const [yy, mm, dd] = input.split("-").map(Number);
         return new Date(yy, mm - 1, dd);
@@ -267,9 +248,7 @@ function sortDates() {
             if (Array.isArray(task.completionDates)) {
                 task.completionDates.sort((a, b) => new Date(b) - new Date(a));
             }
-            if (task.children?.length) {
-                recurSort(task.children);
-            }
+            if (task.children?.length) recurSort(task.children);
         });
     }
     recurSort(tasks);
@@ -278,21 +257,17 @@ function diffDays(task, prevCompDate, targetDate) {
     const last = parseDate(prevCompDate);
     const next = new Date(last.getTime() + task.intervalDays * dayMS);
     const target = parseDate(targetDate);
-
     return Math.ceil((next - target) / dayMS);
 }
 function generateDates() {
     const result = [];
-
     const start = calendarStartDate || today;
     const end = calendarEndDate || new Date(start.getTime() + 14 * 86400000);
-
     let cursor = new Date(start);
     while (cursor <= end) {
         result.push(new Date(cursor));
         cursor.setDate(cursor.getDate() + 1);
     }
-
     return result;
 }
 function updateDateRange() {
@@ -304,58 +279,43 @@ function updateDateRange() {
 function toggleHoliday(event) {
     const th = event.target.closest("th[data-date]");
     if (!th) return;
-
     const ds = th?.dataset?.date;
     if (!ds) return;
-
     execute(() => {
         if (holidayDates.has(ds)) holidayDates.delete(ds);
         else holidayDates.add(ds);
     });
 }
-async function toggleComplete(event) {
+function toggleComplete(event) {
     const td = event.target.closest("td[data-id]");
     if (!td) return;
-
     const { id, date } = td.dataset;
-
     const found = idMap.get(id);
     if (!found) return;
-
     execute(() => {
-        // 切換完成狀態
         const i = found.completionDates.indexOf(date);
-        if (i >= 0) {
-            found.completionDates.splice(i, 1);
-        } else {
-            found.completionDates.push(date);
-        }
+        if (i >= 0) found.completionDates.splice(i, 1);
+        else found.completionDates.push(date);
     });
 }
 
+// ===========================
 // 3b. Tasks
+// ===========================
 function buildIdMap(list) {
     idMap.clear();
     const stack = [...list];
-
     while (stack.length) {
         const task = stack.pop();
         idMap.set(task.id, task);
-        if (task.children?.length) {
-            stack.push(...task.children);
-        }
+        if (task.children?.length) stack.push(...task.children);
     }
 }
 function flattenTasks(data, parentPath = [], visible = true) {
     const list = [];
-
     data.forEach(task => {
         const path = [...parentPath, task.title];
-
-        if (visible) {
-            list.push({ ...task, fullTitle: path.join(" / ") });
-        }
-
+        if (visible) list.push({ ...task, fullTitle: path.join(" / ") });
         const showChildren = !task.collapsed;
         if (showChildren && task.children?.length) {
             list.push(...flattenTasks(task.children, path, showChildren));
@@ -365,10 +325,7 @@ function flattenTasks(data, parentPath = [], visible = true) {
 }
 function getTaskByPath(path) {
     let ref = tasks;
-    // path: [0,2,1] 代表 tasks[0].children[2].children[1]
-    for (let i = 0; i < path.length - 1; i++) {
-        ref = ref[path[i]].children;
-    }
+    for (let i = 0; i < path.length - 1; i++) ref = ref[path[i]].children;
     return {
         parent: ref,
         index: path[path.length - 1],
@@ -380,13 +337,12 @@ function findTaskPath(target, data = tasks, path = []) {
         const t = data[i];
         const currentPath = [...path, i];
         if (t === target) return currentPath;
-
         if (Array.isArray(t.children)) {
             const childPath = findTaskPath(target, t.children, currentPath);
             if (childPath) return childPath;
         }
     }
-    return null; // 沒找到
+    return null;
 }
 function newTask() {
     return {
@@ -402,63 +358,48 @@ function newTask() {
 function toggleTaskCollapse(event) {
     const li = event.target.closest(".task-node");
     if (!li) return;
-
     const path = li.dataset.path.split(",").map(Number);
     const { task } = getTaskByPath(path);
-
     if (event.target.matches(".toggle-btn")) {
-        execute(() => {
-            task.collapsed = !task.collapsed;
-        });
-    }
-    else if (event.target.matches(".add-child-btn")) {
-        if (!Array.isArray(task.children)) {
-            task.children = [];
-        }
+        execute(() => { task.collapsed = !task.collapsed; });
+    } else if (event.target.matches(".add-child-btn")) {
+        if (!Array.isArray(task.children)) task.children = [];
         openTaskEditor(newTask(), task.children);
-    }
-    else if (event.target.matches(".edit-btn")) {
+    } else if (event.target.matches(".edit-btn")) {
         openTaskEditor(task);
     }
-};
+}
 
-// 3c. Memo
+// ===========================
+// 3c. Memo & List
+// ===========================
 function deleteMemo(index) {
     if (confirm("確定要刪除這個備忘事項？")) {
-        execute(() => {
-            memos.splice(index, 1);
-        });
+        execute(() => { memos.splice(index, 1); });
     }
 }
 function toggleListItem(list, number) {
     execute(() => {
         const idx = list.doneNumbers.indexOf(number);
-        if (idx >= 0) {
-            list.doneNumbers.splice(idx, 1);
-        } else {
-            list.doneNumbers.push(number);
-        }
+        if (idx >= 0) list.doneNumbers.splice(idx, 1);
+        else list.doneNumbers.push(number);
     });
 }
 function clearListDone(list) {
-    execute(() => {
-        list.doneNumbers = [];
-    });
+    execute(() => { list.doneNumbers = []; });
 }
 function deleteList(id) {
-    execute(() => {
-        lists = lists.filter(list => list.id !== id);
-    });
+    execute(() => { lists = lists.filter(list => list.id !== id); });
 }
 
-// 3d. Window
+// ===========================
+// 3d. Window (Editor)
+// ===========================
 function openTaskEditor(task, parentArray = null) {
     document.querySelector("#task-editor")?.remove();
-
     const editor = document.createElement("div");
     editor.id = "task-editor";
     editor.className = "editor";
-
     // 任務名稱
     const labelTitle = document.createElement("label");
     labelTitle.textContent = "任務名稱：";
@@ -466,7 +407,6 @@ function openTaskEditor(task, parentArray = null) {
     inputTitle.type = "text";
     inputTitle.id = "edit-title";
     inputTitle.value = task.title || "";
-
     // 週期
     const labelInterval = document.createElement("label");
     labelInterval.textContent = "週期（天）：";
@@ -474,7 +414,6 @@ function openTaskEditor(task, parentArray = null) {
     inputInterval.type = "number";
     inputInterval.id = "edit-interval";
     inputInterval.value = task.intervalDays || 7;
-
     // 底色
     const labelColor = document.createElement("label");
     labelColor.textContent = "底色：";
@@ -483,7 +422,6 @@ function openTaskEditor(task, parentArray = null) {
         btn.classList.add("selected");
         task.swatchId = swatchId;
     });
-
     // 編輯按鈕區
     const editorButtons = document.createElement("div");
     editorButtons.className = "editor-buttons";
@@ -500,18 +438,14 @@ function openTaskEditor(task, parentArray = null) {
         deleteBtn.textContent = "刪除任務";
         editorButtons.append(deleteBtn);
     }
-
-    // 組合
     editor.append(labelTitle, inputTitle, labelInterval, inputInterval, labelColor, swatchContainer, editorButtons);
     document.body.appendChild(editor);
-
     saveBtn.onpointerdown = () => {
         execute(() => {
             task.title = inputTitle.value.trim() || "（未命名）";
             task.intervalDays = +inputInterval.value || 0;
             if (parentArray) parentArray.push(task);
         });
-
         editor.remove();
     };
     cancelBtn.onpointerdown = () => editor.remove();
@@ -523,7 +457,6 @@ function openTaskEditor(task, parentArray = null) {
                     const { parent, index } = getTaskByPath(path);
                     parent.splice(index, 1);
                 });
-
                 editor.remove();
             }
         };
@@ -545,23 +478,17 @@ function createColorSwatches(selectedSwatchId, onpointerdown) {
     return container;
 }
 function openMemoEditor(memo, index) {
-    document.querySelector(".task-editor")?.remove();
-
+    document.querySelector(".editor")?.remove();
     const isNew = !memo;
     memo = memo || { text: "", swatchId: 0 };
-
     const editor = document.createElement("div");
-    editor.className = "task-editor";
-
+    editor.className = "editor";
     const label = document.createElement("label");
     label.textContent = "備忘內容：";
-
-    // 使用 <textarea> 替代 <input>
     const textarea = document.createElement("textarea");
     textarea.value = memo.text;
-    textarea.rows = 5; // 預設顯示 5 行
-    textarea.style.width = "100%"; // 設定寬度為 100%
-
+    textarea.rows = 5;
+    textarea.style.width = "100%";
     const labelColor = document.createElement("label");
     labelColor.textContent = "底色：";
     const swatchContainer = createColorSwatches(memo.swatchId, (btn, swatchId) => {
@@ -569,10 +496,8 @@ function openMemoEditor(memo, index) {
         btn.classList.add("selected");
         memo.swatchId = swatchId;
     });
-
     const editorButtons = document.createElement("div");
     editorButtons.className = "editor-buttons";
-
     const saveBtn = document.createElement("button");
     saveBtn.textContent = "儲存";
     saveBtn.onclick = () => {
@@ -582,19 +507,15 @@ function openMemoEditor(memo, index) {
         });
         editor.remove();
     };
-
     const cancelBtn = document.createElement("button");
     cancelBtn.textContent = "取消";
     cancelBtn.onclick = () => editor.remove();
-
     editorButtons.append(saveBtn, cancelBtn);
-
     editor.append(label, textarea, labelColor, swatchContainer, editorButtons);
     document.body.appendChild(editor);
 }
 function openListEditor(list) {
-    document.querySelector(".task-editor")?.remove();
-
+    document.querySelector(".editor")?.remove();
     const isNew = !list;
     list = list || {
         id: generateUniqueId(),
@@ -604,28 +525,23 @@ function openListEditor(list) {
         swatchId: 0,
         doneNumbers: []
     };
-
     const editor = document.createElement("div");
-    editor.className = "task-editor";
-
+    editor.className = "editor";
     const labelName = document.createElement("label");
     labelName.textContent = "清單名稱：";
     const inputName = document.createElement("input");
     inputName.type = "text";
     inputName.value = list.name;
-
     const labelStart = document.createElement("label");
     labelStart.textContent = "開始編號：";
     const inputStart = document.createElement("input");
     inputStart.type = "number";
     inputStart.value = list.startNumber;
-
     const labelEnd = document.createElement("label");
     labelEnd.textContent = "結束編號：";
     const inputEnd = document.createElement("input");
     inputEnd.type = "number";
     inputEnd.value = list.endNumber;
-
     const labelColor = document.createElement("label");
     labelColor.textContent = "底色：";
     const swatchContainer = createColorSwatches(list.swatchId, (btn, swatchId) => {
@@ -633,10 +549,8 @@ function openListEditor(list) {
         btn.classList.add("selected");
         list.swatchId = swatchId;
     });
-
     const editorButtons = document.createElement("div");
     editorButtons.className = "editor-buttons";
-
     const saveBtn = document.createElement("button");
     saveBtn.textContent = "儲存";
     saveBtn.onclick = () => {
@@ -648,13 +562,10 @@ function openListEditor(list) {
         });
         editor.remove();
     };
-
     const cancelBtn = document.createElement("button");
     cancelBtn.textContent = "取消";
     cancelBtn.onclick = () => editor.remove();
-
     editorButtons.append(saveBtn, cancelBtn);
-
     editor.append(labelName, inputName, labelStart, inputStart, labelEnd, inputEnd, labelColor, swatchContainer, editorButtons);
     document.body.appendChild(editor);
 }
@@ -664,30 +575,23 @@ function showToast(msg = "已儲存") {
     setTimeout(() => toast.classList.remove("show"), 2000);
 }
 
+// ===========================
 // 4a. Render utility
+// ===========================
 function refreshAll() {
-    // 記錄所有可滾動元素的捲軸位置
     const scrollPositions = new Map();
     document.querySelectorAll("[data-scrollable]").forEach(el => {
         scrollPositions.set(el.id, el.scrollLeft);
     });
-
-    // 執行刷新邏輯
     today = parseDate(new Date());
     buildIdMap(tasks);
     renderTreeRoot();
     renderCalendar();
     renderMemos();
     renderLists();
-
-    // 恢復所有可滾動元素的捲軸位置
     document.querySelectorAll("[data-scrollable]").forEach(el => {
-        if (scrollPositions.has(el.id)) {
-            el.scrollLeft = scrollPositions.get(el.id);
-        }
+        if (scrollPositions.has(el.id)) el.scrollLeft = scrollPositions.get(el.id);
     });
-
-    // 更新游標樣式
     const taskTitles = document.querySelectorAll(".task-title");
     taskTitles.forEach(title => {
         title.style.cursor = isSortableEnabled ? "move" : "default";
@@ -699,7 +603,7 @@ function generateUniqueId() {
 function clearChildren(parent) {
     while (parent.firstChild) parent.removeChild(parent.firstChild);
 }
-function createFa(iconClass, parentElement) {
+function createIcon(iconClass, parentElement) {
     const icon = document.createElement("i");
     icon.className = `fas ${iconClass}`;
     parentElement.appendChild(icon);
@@ -710,45 +614,32 @@ function refreshToggleSortableBtn() {
     toggleSortableBtn.textContent = isSortableEnabled ? "禁用排序" : "啟用排序";
 }
 function toggleSortable() {
-    // 更新全域變數
     isSortableEnabled = !isSortableEnabled;
-
-    // 切換按鈕狀態
     refreshToggleSortableBtn();
-
-    // 切換所有 Sortable 的啟用狀態
     const sortableContainers = document.querySelectorAll(".task-tree");
     sortableContainers.forEach(container => {
         if (container.sortableInstance) {
             container.sortableInstance.option("disabled", !isSortableEnabled);
         }
     });
-
-    // 切換游標樣式
     const taskTitles = document.querySelectorAll(".task-title");
     taskTitles.forEach(title => {
         title.style.cursor = isSortableEnabled ? "move" : "default";
     });
 }
 
+// ===========================
 // 4b. Render
+// ===========================
 function renderTreeRoot() {
     clearChildren(treeRoot);
-
-    // 新增開關按鈕
     toggleSortableBtn = document.createElement("button");
     toggleSortableBtn.onclick = () => toggleSortable();
     treeRoot.appendChild(toggleSortableBtn);
     toggleSortableBtn.className = "indent full-width-btn";
     toggleSortableBtn.type = "button";
-
     refreshToggleSortableBtn();
-
-
-    // 渲染任務樹
     renderTree(tasks, treeRoot);
-
-    // 新增 "新增任務" 按鈕
     const rootAddBtn = document.createElement("button");
     rootAddBtn.className = "indent full-width-btn";
     rootAddBtn.textContent = "➕ 新增任務";
@@ -762,56 +653,44 @@ function renderTreeRoot() {
 function renderTree(data, parentEl, path = []) {
     const ul = document.createElement("ul");
     ul.className = "task-tree";
-
     data.forEach((task, i) => {
         const li = document.createElement("li");
         li.className = "task-node " + (task.collapsed ? "collapsed" : "expanded");
         li.dataset.path = [...path, i].join(",");
-
         const line = document.createElement("div");
         line.className = "task-line";
         line.style.background = colors[task.swatchId] || "transparent";
-
         const hasChildren = Array.isArray(task.children) && task.children.length > 0;
         const toggleBtn = document.createElement("button");
         toggleBtn.className = "toggle-btn";
         if (hasChildren) {
-            createFa(task.collapsed ? "fa-chevron-right" : "fa-chevron-down", toggleBtn);
+            createIcon(task.collapsed ? "fa-chevron-right" : "fa-chevron-down", toggleBtn);
         } else {
-            createFa("fa-minus", toggleBtn);
+            createIcon("fa-minus", toggleBtn);
             toggleBtn.disabled = true;
             task.collapsed = true;
         }
-
         const titleSpan = document.createElement("span");
         titleSpan.className = "task-title";
         titleSpan.innerHTML = `<span class="day-counter">${task.intervalDays}</span> ${task.title}`;
-
         const ctr = document.createElement("span");
         ctr.className = "controls";
-
         const editBtn = document.createElement("button");
         editBtn.className = "edit-btn";
         editBtn.title = "編輯任務";
-        createFa("fa-pencil", editBtn);
-
+        createIcon("fa-pencil", editBtn);
         const addChildBtn = document.createElement("button");
         addChildBtn.className = "add-child-btn";
         addChildBtn.title = "新增子任務";
-        createFa("fa-baby", addChildBtn);
-
+        createIcon("fa-baby", addChildBtn);
         ctr.append(editBtn, addChildBtn);
-
         line.append(toggleBtn, titleSpan, ctr);
         li.appendChild(line);
-
         if (task.children?.length && !task.collapsed) {
             renderTree(task.children, li, [...path, i]);
         }
-
         ul.appendChild(li);
     });
-
     ul.sortableInstance = new Sortable(ul, {
         animation: 150,
         handle: ".task-title",
@@ -821,75 +700,56 @@ function renderTree(data, parentEl, path = []) {
                 const li = evt.item.closest(".task-node");
                 const parentPath = li.dataset.path.split(",").map(n => +n);
                 const { parent } = getTaskByPath(parentPath);
-
                 const moved = parent.splice(evt.oldIndex, 1)[0];
                 parent.splice(evt.newIndex, 0, moved);
             });
         }
     });
-
     parentEl.appendChild(ul);
 }
 function renderCalendar() {
     clearChildren(dateHead);
     clearChildren(calBody);
-
     const dates = generateDates();
     const dsArr = dates.map(formatDate);
     const todayStr = formatDate(today);
-
-    // header
     const headFrag = document.createDocumentFragment();
     dsArr.forEach(ds => {
         const th = document.createElement("th");
         th.textContent = ds.slice(5);
         th.dataset.date = ds;
         th.title = "點擊設定 / 取消休假日";
-
         if (holidayDates.has(ds)) th.classList.add("holiday");
         if (ds === todayStr) th.classList.add("today");
-
         headFrag.appendChild(th);
     });
     dateHead.appendChild(headFrag);
-
-    // body
     const bodyFrag = document.createDocumentFragment();
     flattenTasks(tasks).forEach(task => {
         const tr = document.createElement("tr");
         tr.style.background = colors[task.swatchId] || "transparent";
         const compDates = (task.completionDates || []).map(parseDate);
-
         dsArr.forEach(ds => {
             const td = document.createElement("td");
             const currDate = parseDate(ds);
-
-            // 找到當前日期之前最新的完成日
             const prevCompDate = compDates.find(d => d <= currDate) || null;
-
             if (compDates.some(d => formatDate(d) === formatDate(currDate))) {
-                // 當前日期是完成日
                 td.classList.add(currDate <= today ? "done-past" : "done-future");
-                createFa(currDate <= today ? "fa-check" : "fa-paperclip", td);
+                createIcon(currDate <= today ? "fa-check" : "fa-paperclip", td);
             } else if (prevCompDate) {
-                // 當前日期之前有完成日
                 const diff = diffDays(task, prevCompDate, currDate);
                 td.classList.add(diff >= 0 ? "pending" : "overdue");
                 td.textContent = String(Math.abs(diff));
             } else {
-                // 當前日期在第一個完成日之前
                 td.classList.add("normal");
                 td.textContent = ".";
             }
-
             if (holidayDates.has(ds)) td.classList.add("holiday");
             if (ds === todayStr) td.classList.add("today");
-
             td.dataset.id = task.id;
             td.dataset.date = ds;
             tr.appendChild(td);
         });
-
         bodyFrag.appendChild(tr);
     });
     calBody.appendChild(bodyFrag);
@@ -897,44 +757,34 @@ function renderCalendar() {
 function renderMemos() {
     clearChildren(memoList);
     clearChildren(memoroot);
-
-    // 動態生成 ul
     const ul = document.createElement("ul");
     ul.id = "memo-list";
     ul.className = "task-tree";
-
     memos.forEach((memo, index) => {
         const li = document.createElement("li");
         li.className = "task-node";
         li.dataset.index = index;
-
         const line = document.createElement("div");
         line.className = "task-line";
         line.style.background = colors[memo.swatchId] || "transparent";
-
-        // 使用 <span> 並設定 white-space: pre-wrap 來顯示多行文字
         const textSpan = document.createElement("span");
         textSpan.textContent = memo.text;
         textSpan.className = "task-title";
         textSpan.style.margin = "3px";
-
         const editBtn = document.createElement("button");
         editBtn.className = "edit-btn";
         editBtn.title = "編輯備忘";
-        createFa("fa-pencil", editBtn);
+        createIcon("fa-pencil", editBtn);
         editBtn.onclick = () => openMemoEditor(memo, index);
-
         const deleteBtn = document.createElement("button");
         deleteBtn.className = "delete-btn";
         deleteBtn.title = "刪除備忘";
-        createFa("fa-trash", deleteBtn);
+        createIcon("fa-trash", deleteBtn);
         deleteBtn.onclick = () => deleteMemo(index);
-
         line.append(textSpan, editBtn, deleteBtn);
         li.appendChild(line);
         ul.appendChild(li);
     });
-
     ul.sortableInstance = new Sortable(ul, {
         animation: 150,
         handle: ".task-title",
@@ -946,42 +796,30 @@ function renderMemos() {
             });
         }
     });
-
-    // 新增按鈕（ul之後）
     const addBtn = document.createElement("button");
     addBtn.className = "indent full-width-btn";
     addBtn.type = "button";
     addBtn.textContent = "➕ 新增備忘";
     addBtn.onclick = () => openMemoEditor();
-
     memoroot.appendChild(ul);
     memoroot.appendChild(addBtn);
 }
 function renderLists() {
     clearChildren(listContainer);
     clearChildren(listroot);
-
-    // 動態生成 ul
     const ul = document.createElement("ul");
     ul.id = "list-container";
     ul.className = "task-tree";
-
     lists.forEach((list, index) => {
         const li = document.createElement("li");
         li.className = "task-node";
         li.dataset.index = index;
-
-        // 渲染標題列
         const titleRow = createListTitleRow(list);
         li.appendChild(titleRow);
-
-        // 渲染表格
         const tableDiv = createListTable(list);
         li.appendChild(tableDiv);
-
         ul.appendChild(li);
     });
-
     ul.sortableInstance = new Sortable(ul, {
         animation: 150,
         handle: ".task-title",
@@ -993,70 +831,49 @@ function renderLists() {
             });
         }
     });
-
-    // 新增按鈕（ul之後）
     const addBtn = document.createElement("button");
     addBtn.className = "indent full-width-btn";
     addBtn.type = "button";
     addBtn.textContent = "➕ 新增清單";
     addBtn.onclick = () => openListEditor();
-
     listroot.appendChild(ul);
     listroot.appendChild(addBtn);
 }
 function createListTitleRow(list) {
-    // 創建標題列
     const titleRow = document.createElement("div");
     titleRow.className = "task-line";
-
-    // 標題
     const title = document.createElement("span");
     title.textContent = list.name;
     title.className = "task-title";
-
-    // 按鈕區
     const btnBar = document.createElement("span");
     btnBar.className = "controls";
-
-    // 編輯按鈕
     const editBtn = document.createElement("button");
     editBtn.className = "edit-btn";
     editBtn.title = "編輯清單";
-    createFa("fa-pencil", editBtn);
+    createIcon("fa-pencil", editBtn);
     editBtn.onclick = () => openListEditor(list);
-
-    // 清除已完成
     const clearBtn = document.createElement("button");
     clearBtn.className = "clear-btn";
     clearBtn.title = "清除所有完成";
-    createFa("fa-eraser", clearBtn);
+    createIcon("fa-eraser", clearBtn);
     clearBtn.onclick = () => clearListDone(list);
-
-    // 刪除按鈕
     const deleteBtn = document.createElement("button");
     deleteBtn.className = "delete-btn";
     deleteBtn.title = "刪除清單";
-    createFa("fa-trash", deleteBtn);
+    createIcon("fa-trash", deleteBtn);
     deleteBtn.onclick = () => deleteList(list.id);
-
     btnBar.append(editBtn, clearBtn, deleteBtn);
     titleRow.append(title, btnBar);
-
     return titleRow;
 }
 function createListTable(list) {
-    // 創建表格容器
     const tableDiv = document.createElement("div");
     tableDiv.id = list.id;
     tableDiv.className = "calendar-column";
     tableDiv.setAttribute("data-scrollable", "");
-
-    // 表格
     const table = document.createElement("table");
     table.className = "calendar-table";
     table.style.background = colors[list.swatchId] || "transparent";
-
-    // 表體
     const tbody = document.createElement("tbody");
     const trBody = document.createElement("tr");
     for (let j = list.startNumber; j <= list.endNumber; j++) {
@@ -1070,11 +887,12 @@ function createListTable(list) {
     tbody.appendChild(trBody);
     table.appendChild(tbody);
     tableDiv.append(table);
-
     return tableDiv;
 }
 
+// ===========================
 // 5. Event delegation
+// ===========================
 document.addEventListener("DOMContentLoaded", checkFileSystemSupport);
 dateHead.addEventListener("click", toggleHoliday);
 treeRoot.addEventListener("click", toggleTaskCollapse);
