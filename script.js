@@ -276,32 +276,21 @@ function updateDateRange() {
         calendarEndDate = calEnd.value ? parseDate(calEnd.value) : null;
     });
 }
-function toggleHoliday(event) {
-    const th = event.target.closest("th[data-date]");
-    if (!th) return;
-    const ds = th?.dataset?.date;
-    if (!ds) return;
-    execute(() => {
-        if (holidayDates.has(ds)) holidayDates.delete(ds);
-        else holidayDates.add(ds);
-    });
-}
-function toggleComplete(event) {
-    const td = event.target.closest("td[data-id]");
-    if (!td) return;
-    const { id, date } = td.dataset;
-    const found = idMap.get(id);
-    if (!found) return;
-    execute(() => {
-        const i = found.completionDates.indexOf(date);
-        if (i >= 0) found.completionDates.splice(i, 1);
-        else found.completionDates.push(date);
-    });
-}
 
 // ===========================
-// 3b. Tasks
+// 3b. Tasks & Calendar
 // ===========================
+function newTask() {
+    return {
+        id: Date.now().toString(),
+        title: "",
+        intervalDays: 0,
+        swatchId: 0,
+        completionDates: [],
+        collapsed: true,
+        children: []
+    };
+}
 function buildIdMap(list) {
     idMap.clear();
     const stack = [...list];
@@ -344,17 +333,6 @@ function findTaskPath(target, data = tasks, path = []) {
     }
     return null;
 }
-function newTask() {
-    return {
-        id: Date.now().toString(),
-        title: "",
-        intervalDays: 0,
-        swatchId: 0,
-        completionDates: [],
-        collapsed: true,
-        children: []
-    };
-}
 function toggleTaskCollapse(event) {
     const li = event.target.closest(".task-node");
     if (!li) return;
@@ -369,14 +347,52 @@ function toggleTaskCollapse(event) {
         openTaskEditor(task);
     }
 }
+function toggleHoliday(event) {
+    const th = event.target.closest("th[data-date]");
+    if (!th) return;
+    const ds = th?.dataset?.date;
+    if (!ds) return;
+    execute(() => {
+        if (holidayDates.has(ds)) holidayDates.delete(ds);
+        else holidayDates.add(ds);
+    });
+}
+function toggleComplete(event) {
+    const td = event.target.closest("td[data-id]");
+    if (!td) return;
+    const { id, date } = td.dataset;
+    const found = idMap.get(id);
+    if (!found) return;
+    execute(() => {
+        const i = found.completionDates.indexOf(date);
+        if (i >= 0) found.completionDates.splice(i, 1);
+        else found.completionDates.push(date);
+    });
+}
 
 // ===========================
 // 3c. Memo & List
 // ===========================
+function newMemo() {
+    return {
+        text: "",
+        swatchId: 0
+    };
+}
 function deleteMemo(index) {
     if (confirm("確定要刪除這個備忘事項？")) {
         execute(() => { memos.splice(index, 1); });
     }
+}
+function newList() {
+    return {
+        id: generateUniqueId(),
+        name: "",
+        startNumber: 1,
+        endNumber: 10,
+        swatchId: 0,
+        doneNumbers: []
+    };
 }
 function toggleListItem(list, number) {
     execute(() => {
@@ -480,7 +496,7 @@ function createColorSwatches(selectedSwatchId, onpointerdown) {
 function openMemoEditor(memo, index) {
     document.querySelector(".editor")?.remove();
     const isNew = !memo;
-    memo = memo || { text: "", swatchId: 0 };
+    memo = memo || newMemo();
     const editor = document.createElement("div");
     editor.className = "editor";
     const label = document.createElement("label");
@@ -517,14 +533,7 @@ function openMemoEditor(memo, index) {
 function openListEditor(list) {
     document.querySelector(".editor")?.remove();
     const isNew = !list;
-    list = list || {
-        id: generateUniqueId(),
-        name: "",
-        startNumber: 1,
-        endNumber: 10,
-        swatchId: 0,
-        doneNumbers: []
-    };
+    list = list || newList();
     const editor = document.createElement("div");
     editor.className = "editor";
     const labelName = document.createElement("label");
@@ -657,34 +666,7 @@ function renderTree(data, parentEl, path = []) {
         const li = document.createElement("li");
         li.className = "task-node " + (task.collapsed ? "collapsed" : "expanded");
         li.dataset.path = [...path, i].join(",");
-        const line = document.createElement("div");
-        line.className = "task-line";
-        line.style.background = colors[task.swatchId] || "transparent";
-        const hasChildren = Array.isArray(task.children) && task.children.length > 0;
-        const toggleBtn = document.createElement("button");
-        toggleBtn.className = "toggle-btn";
-        if (hasChildren) {
-            createIcon(task.collapsed ? "fa-chevron-right" : "fa-chevron-down", toggleBtn);
-        } else {
-            createIcon("fa-minus", toggleBtn);
-            toggleBtn.disabled = true;
-            task.collapsed = true;
-        }
-        const titleSpan = document.createElement("span");
-        titleSpan.className = "task-title";
-        titleSpan.innerHTML = `<span class="day-counter">${task.intervalDays}</span> ${task.title}`;
-        const ctr = document.createElement("span");
-        ctr.className = "controls";
-        const editBtn = document.createElement("button");
-        editBtn.className = "edit-btn";
-        editBtn.title = "編輯任務";
-        createIcon("fa-pencil", editBtn);
-        const addChildBtn = document.createElement("button");
-        addChildBtn.className = "add-child-btn";
-        addChildBtn.title = "新增子任務";
-        createIcon("fa-baby", addChildBtn);
-        ctr.append(editBtn, addChildBtn);
-        line.append(toggleBtn, titleSpan, ctr);
+        const line = createTaskLine(task, [...path, i]);
         li.appendChild(line);
         if (task.children?.length && !task.collapsed) {
             renderTree(task.children, li, [...path, i]);
@@ -707,6 +689,42 @@ function renderTree(data, parentEl, path = []) {
     });
     parentEl.appendChild(ul);
 }
+function createTaskLine(task, path) {
+    const line = document.createElement("div");
+    line.className = "task-line";
+    line.style.background = colors[task.swatchId] || "transparent";
+
+    const hasChildren = Array.isArray(task.children) && task.children.length > 0;
+    const toggleBtn = document.createElement("button");
+    toggleBtn.className = "toggle-btn";
+    if (hasChildren) {
+        createIcon(task.collapsed ? "fa-chevron-right" : "fa-chevron-down", toggleBtn);
+    } else {
+        createIcon("fa-minus", toggleBtn);
+        toggleBtn.disabled = true;
+        task.collapsed = true;
+    }
+
+    const titleSpan = document.createElement("span");
+    titleSpan.className = "task-title";
+    titleSpan.innerHTML = `<span class="day-counter">${task.intervalDays}</span> ${task.title}`;
+
+    const ctr = document.createElement("span");
+    ctr.className = "controls";
+    const editBtn = document.createElement("button");
+    editBtn.className = "edit-btn";
+    editBtn.title = "編輯任務";
+    createIcon("fa-pencil", editBtn);
+    const addChildBtn = document.createElement("button");
+    addChildBtn.className = "add-child-btn";
+    addChildBtn.title = "新增子任務";
+    createIcon("fa-baby", addChildBtn);
+    ctr.append(editBtn, addChildBtn);
+
+    line.append(toggleBtn, titleSpan, ctr);
+    return line;
+}
+
 function renderCalendar() {
     clearChildren(dateHead);
     clearChildren(calBody);
@@ -726,34 +744,44 @@ function renderCalendar() {
     dateHead.appendChild(headFrag);
     const bodyFrag = document.createDocumentFragment();
     flattenTasks(tasks).forEach(task => {
-        const tr = document.createElement("tr");
-        tr.style.background = colors[task.swatchId] || "transparent";
-        const compDates = (task.completionDates || []).map(parseDate);
-        dsArr.forEach(ds => {
-            const td = document.createElement("td");
-            const currDate = parseDate(ds);
-            const prevCompDate = compDates.find(d => d <= currDate) || null;
-            if (compDates.some(d => formatDate(d) === formatDate(currDate))) {
-                td.classList.add(currDate <= today ? "done-past" : "done-future");
-                createIcon(currDate <= today ? "fa-check" : "fa-paperclip", td);
-            } else if (prevCompDate) {
-                const diff = diffDays(task, prevCompDate, currDate);
-                td.classList.add(diff >= 0 ? "pending" : "overdue");
-                td.textContent = String(Math.abs(diff));
-            } else {
-                td.classList.add("normal");
-                td.textContent = ".";
-            }
-            if (holidayDates.has(ds)) td.classList.add("holiday");
-            if (ds === todayStr) td.classList.add("today");
-            td.dataset.id = task.id;
-            td.dataset.date = ds;
-            tr.appendChild(td);
-        });
+        const tr = createCalendarRow(task, dsArr, todayStr, colors);
         bodyFrag.appendChild(tr);
     });
     calBody.appendChild(bodyFrag);
 }
+function createCalendarRow(task, dsArr, todayStr, colors) {
+    const tr = document.createElement("tr");
+    tr.style.background = colors[task.swatchId] || "transparent";
+    const compDates = (task.completionDates || []).map(parseDate);
+
+    dsArr.forEach(ds => {
+        const td = document.createElement("td");
+        const currDate = parseDate(ds);
+        const prevCompDate = compDates.find(d => d <= currDate) || null;
+
+        if (compDates.some(d => formatDate(d) === formatDate(currDate))) {
+            td.classList.add(currDate <= today ? "done-past" : "done-future");
+            createIcon(currDate <= today ? "fa-check" : "fa-paperclip", td);
+        } else if (prevCompDate) {
+            const diff = diffDays(task, prevCompDate, currDate);
+            td.classList.add(diff >= 0 ? "pending" : "overdue");
+            td.textContent = String(Math.abs(diff));
+        } else {
+            td.classList.add("normal");
+            td.textContent = ".";
+        }
+
+        if (holidayDates.has(ds)) td.classList.add("holiday");
+        if (ds === todayStr) td.classList.add("today");
+
+        td.dataset.id = task.id;
+        td.dataset.date = ds;
+        tr.appendChild(td);
+    });
+
+    return tr;
+}
+
 function renderMemos() {
     clearChildren(memoList);
     clearChildren(memoroot);
@@ -761,28 +789,7 @@ function renderMemos() {
     ul.id = "memo-list";
     ul.className = "task-tree";
     memos.forEach((memo, index) => {
-        const li = document.createElement("li");
-        li.className = "task-node";
-        li.dataset.index = index;
-        const line = document.createElement("div");
-        line.className = "task-line";
-        line.style.background = colors[memo.swatchId] || "transparent";
-        const textSpan = document.createElement("span");
-        textSpan.textContent = memo.text;
-        textSpan.className = "task-title";
-        textSpan.style.margin = "3px";
-        const editBtn = document.createElement("button");
-        editBtn.className = "edit-btn";
-        editBtn.title = "編輯備忘";
-        createIcon("fa-pencil", editBtn);
-        editBtn.onclick = () => openMemoEditor(memo, index);
-        const deleteBtn = document.createElement("button");
-        deleteBtn.className = "delete-btn";
-        deleteBtn.title = "刪除備忘";
-        createIcon("fa-trash", deleteBtn);
-        deleteBtn.onclick = () => deleteMemo(index);
-        line.append(textSpan, editBtn, deleteBtn);
-        li.appendChild(line);
+        const li = createMemoLine(memo, index, colors);
         ul.appendChild(li);
     });
     ul.sortableInstance = new Sortable(ul, {
@@ -800,10 +807,42 @@ function renderMemos() {
     addBtn.className = "indent full-width-btn";
     addBtn.type = "button";
     addBtn.textContent = "➕ 新增備忘";
-    addBtn.onclick = () => openMemoEditor();
+    addBtn.onclick = () => openMemoEditor(newMemo(), memos.length);
     memoroot.appendChild(ul);
     memoroot.appendChild(addBtn);
 }
+function createMemoLine(memo, index, colors) {
+    const li = document.createElement("li");
+    li.className = "task-node";
+    li.dataset.index = index;
+
+    const line = document.createElement("div");
+    line.className = "task-line";
+    line.style.background = colors[memo.swatchId] || "transparent";
+
+    const textSpan = document.createElement("span");
+    textSpan.textContent = memo.text;
+    textSpan.className = "task-title";
+    textSpan.style.margin = "3px";
+
+    const editBtn = document.createElement("button");
+    editBtn.className = "edit-btn";
+    editBtn.title = "編輯備忘";
+    createIcon("fa-pencil", editBtn);
+    editBtn.onclick = () => openMemoEditor(memo, index);
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.className = "delete-btn";
+    deleteBtn.title = "刪除備忘";
+    createIcon("fa-trash", deleteBtn);
+    deleteBtn.onclick = () => deleteMemo(index);
+
+    line.append(textSpan, editBtn, deleteBtn);
+    li.appendChild(line);
+
+    return li;
+}
+
 function renderLists() {
     clearChildren(listContainer);
     clearChildren(listroot);
@@ -811,13 +850,7 @@ function renderLists() {
     ul.id = "list-container";
     ul.className = "task-tree";
     lists.forEach((list, index) => {
-        const li = document.createElement("li");
-        li.className = "task-node";
-        li.dataset.index = index;
-        const titleRow = createListTitleRow(list);
-        li.appendChild(titleRow);
-        const tableDiv = createListTable(list);
-        li.appendChild(tableDiv);
+        const li = createListLine(list, index, colors);
         ul.appendChild(li);
     });
     ul.sortableInstance = new Sortable(ul, {
@@ -835,11 +868,26 @@ function renderLists() {
     addBtn.className = "indent full-width-btn";
     addBtn.type = "button";
     addBtn.textContent = "➕ 新增清單";
-    addBtn.onclick = () => openListEditor();
+    addBtn.onclick = () => openListEditor(newList());
     listroot.appendChild(ul);
     listroot.appendChild(addBtn);
 }
-function createListTitleRow(list) {
+function createListLine(list, index, colors) {
+    const li = document.createElement("li");
+    li.className = "task-node";
+    li.dataset.index = index;
+
+    // 標題列
+    const titleRow = createListTitle(list);
+    li.appendChild(titleRow);
+
+    // 表格
+    const tableDiv = createListTable(list);
+    li.appendChild(tableDiv);
+
+    return li;
+}
+function createListTitle(list) {
     const titleRow = document.createElement("div");
     titleRow.className = "task-line";
     const title = document.createElement("span");
