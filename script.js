@@ -3,20 +3,20 @@
 // ===========================
 const treeRoot = document.getElementById("task-tree-root");
 const dateHead = document.getElementById("date-header");
-const calStart = document.getElementById("calendar-start");
-const calEnd = document.getElementById("calendar-end");
-const calBody = document.getElementById("calendar-body");
+const calendarStart = document.getElementById("calendar-start");
+const calendarEnd = document.getElementById("calendar-end");
+const calendarBody = document.getElementById("calendar-body");
 const toast = document.getElementById("save-toast");
-const listroot = document.getElementById("list-root");
+const listRoot = document.getElementById("list-root");
 const listContainer = document.getElementById("list-container");
-const memoroot = document.getElementById("memo-root");
+const memoRoot = document.getElementById("memo-root");
 const memoList = document.getElementById("memo-list");
 
 const undoStack = [];
 const redoStack = [];
 const holidayDates = new Set();
 const farFuture = "2700-02-27";
-const dayMS = 1000 * 60 * 60 * 24;
+const dayMs = 1000 * 60 * 60 * 24;
 const colors = [
     "",         // 無底色
     "#ddf",     // 靛紫／輕柔
@@ -97,9 +97,9 @@ async function loadFile(file) {
 
     if (data.calendarRange) {
         calendarStartDate = data.calendarRange.start ? parseDate(data.calendarRange.start) : null;
-        calStart.value = data.calendarRange.start;
+        calendarStart.value = data.calendarRange.start;
         calendarEndDate = data.calendarRange.end ? parseDate(data.calendarRange.end) : null;
-        calEnd.value = data.calendarRange.end;
+        calendarEnd.value = data.calendarRange.end;
     }
 
     if (Array.isArray(data.tasks)) {
@@ -255,9 +255,9 @@ function sortDates() {
 }
 function diffDays(task, prevCompDate, targetDate) {
     const last = parseDate(prevCompDate);
-    const next = new Date(last.getTime() + task.intervalDays * dayMS);
+    const next = new Date(last.getTime() + task.intervalDays * dayMs);
     const target = parseDate(targetDate);
-    return Math.ceil((next - target) / dayMS);
+    return Math.ceil((next - target) / dayMs);
 }
 function generateDates() {
     const result = [];
@@ -272,8 +272,8 @@ function generateDates() {
 }
 function updateDateRange() {
     execute(() => {
-        calendarStartDate = calStart.value ? parseDate(calStart.value) : null;
-        calendarEndDate = calEnd.value ? parseDate(calEnd.value) : null;
+        calendarStartDate = calendarStart.value ? parseDate(calendarStart.value) : null;
+        calendarEndDate = calendarEnd.value ? parseDate(calendarEnd.value) : null;
     });
 }
 
@@ -290,6 +290,18 @@ function newTask() {
         collapsed: true,
         children: []
     };
+}
+function deleteTask(task) {
+    const path = findTaskPath(task);
+    if (!path) return false;
+    if (confirm("確定要刪除這個任務？")) {
+        execute(() => {
+            const { parent, index } = getTaskByPath(path);
+            parent.splice(index, 1);
+        });
+        return true;
+    }
+    return false;
 }
 function buildIdMap(list) {
     idMap.clear();
@@ -342,9 +354,9 @@ function toggleTaskCollapse(event) {
         execute(() => { task.collapsed = !task.collapsed; });
     } else if (event.target.matches(".add-child-btn")) {
         if (!Array.isArray(task.children)) task.children = [];
-        openTaskEditor(newTask(), task.children);
+        openTaskEditor(newTask(), task.children, true);
     } else if (event.target.matches(".edit-btn")) {
-        openTaskEditor(task);
+        openTaskEditor(task, null, false);
     }
 }
 function toggleHoliday(event) {
@@ -382,7 +394,9 @@ function newMemo() {
 function deleteMemo(index) {
     if (confirm("確定要刪除這個備忘事項？")) {
         execute(() => { memos.splice(index, 1); });
+        return true;
     }
+    return false;
 }
 function newList() {
     return {
@@ -394,6 +408,13 @@ function newList() {
         doneNumbers: []
     };
 }
+function deleteList(id) {
+    if (confirm("確定要刪除這個清單？")) {
+        execute(() => { lists = lists.filter(list => list.id !== id); });
+        return true;
+    }
+    return false;
+}
 function toggleListItem(list, number) {
     execute(() => {
         const idx = list.doneNumbers.indexOf(number);
@@ -404,80 +425,10 @@ function toggleListItem(list, number) {
 function clearListDone(list) {
     execute(() => { list.doneNumbers = []; });
 }
-function deleteList(id) {
-    execute(() => { lists = lists.filter(list => list.id !== id); });
-}
 
 // ===========================
 // 3d. Window (Editor)
 // ===========================
-function openTaskEditor(task, parentArray = null) {
-    document.querySelector("#task-editor")?.remove();
-    const editor = document.createElement("div");
-    editor.id = "task-editor";
-    editor.className = "editor";
-    // 任務名稱
-    const labelTitle = document.createElement("label");
-    labelTitle.textContent = "任務名稱：";
-    const inputTitle = document.createElement("input");
-    inputTitle.type = "text";
-    inputTitle.id = "edit-title";
-    inputTitle.value = task.title || "";
-    // 週期
-    const labelInterval = document.createElement("label");
-    labelInterval.textContent = "週期（天）：";
-    const inputInterval = document.createElement("input");
-    inputInterval.type = "number";
-    inputInterval.id = "edit-interval";
-    inputInterval.value = task.intervalDays || 7;
-    // 底色
-    const labelColor = document.createElement("label");
-    labelColor.textContent = "底色：";
-    const swatchContainer = createColorSwatches(task.swatchId, (btn, swatchId) => {
-        swatchContainer.querySelectorAll(".swatch").forEach(b => b.classList.remove("selected"));
-        btn.classList.add("selected");
-        task.swatchId = swatchId;
-    });
-    // 編輯按鈕區
-    const editorButtons = document.createElement("div");
-    editorButtons.className = "editor-buttons";
-    const saveBtn = document.createElement("button");
-    saveBtn.id = "save-task";
-    saveBtn.textContent = "儲存";
-    const cancelBtn = document.createElement("button");
-    cancelBtn.id = "cancel-task";
-    cancelBtn.textContent = "取消";
-    editorButtons.append(saveBtn, cancelBtn);
-    if (!parentArray) {
-        const deleteBtn = document.createElement("button");
-        deleteBtn.id = "delete-task";
-        deleteBtn.textContent = "刪除任務";
-        editorButtons.append(deleteBtn);
-    }
-    editor.append(labelTitle, inputTitle, labelInterval, inputInterval, labelColor, swatchContainer, editorButtons);
-    document.body.appendChild(editor);
-    saveBtn.onpointerdown = () => {
-        execute(() => {
-            task.title = inputTitle.value.trim() || "（未命名）";
-            task.intervalDays = +inputInterval.value || 0;
-            if (parentArray) parentArray.push(task);
-        });
-        editor.remove();
-    };
-    cancelBtn.onpointerdown = () => editor.remove();
-    if (!parentArray) {
-        editor.querySelector("#delete-task").onpointerdown = () => {
-            if (confirm("確定要刪除這個任務？")) {
-                execute(() => {
-                    const path = findTaskPath(task);
-                    const { parent, index } = getTaskByPath(path);
-                    parent.splice(index, 1);
-                });
-                editor.remove();
-            }
-        };
-    }
-}
 function createColorSwatches(selectedSwatchId, onpointerdown) {
     const container = document.createElement("div");
     container.className = "color-swatches";
@@ -493,91 +444,178 @@ function createColorSwatches(selectedSwatchId, onpointerdown) {
     });
     return container;
 }
-function openMemoEditor(memo, index) {
+/**
+ * 開啟編輯器視窗。
+ * @param {Object} options - 編輯器選項。
+ * @param {string} [options.title] - 編輯器標題。
+ * @param {HTMLElement[]} options.fields - 欄位元素陣列。
+ * @param {number} [options.swatchId] - 預設選取的顏色索引。
+ * @param {function} [options.onSwatchChange] - 顏色選擇變更時的回呼。
+ * @param {function} options.onSave - 儲存時的回呼，參數為編輯器元素。
+ * @param {function} [options.onDelete] - 刪除時的回呼。
+ * @param {boolean} options.isNew - 是否為新增模式。
+ */
+function openEditor(options) {
     document.querySelector(".editor")?.remove();
-    const isNew = !memo;
-    memo = memo || newMemo();
     const editor = document.createElement("div");
     editor.className = "editor";
+
+    // 標題（可選）
+    if (options.title) {
+        const h2 = document.createElement("h2");
+        h2.textContent = options.title;
+        editor.appendChild(h2);
+    }
+
+    // 欄位
+    options.fields.forEach(field => editor.appendChild(field));
+
+    // 顏色選擇
+    if (typeof options.swatchId !== "undefined") {
+        const swatchContainer = createColorSwatches(options.swatchId, (btn, swatchId) => {
+            swatchContainer.querySelectorAll(".swatch").forEach(b => b.classList.remove("selected"));
+            btn.classList.add("selected");
+            options.onSwatchChange(swatchId);
+        });
+        editor.appendChild(swatchContainer);
+    }
+
+    // 按鈕區
+    const editorButtons = document.createElement("div");
+    editorButtons.className = "editor-buttons";
+    const saveBtn = document.createElement("button");
+    saveBtn.textContent = "儲存";
+    const cancelBtn = document.createElement("button");
+    cancelBtn.textContent = "取消";
+    editorButtons.append(saveBtn, cancelBtn);
+
+    saveBtn.onclick = () => {
+        options.onSave(editor);
+        editor.remove();
+    };
+    cancelBtn.onclick = () => editor.remove();
+
+    if (!options.isNew && typeof options.onDelete === "function") {
+        const deleteBtn = document.createElement("button");
+        deleteBtn.textContent = "刪除";
+        editorButtons.append(deleteBtn);
+        deleteBtn.onclick = () => {
+            if (options.onDelete() === true) editor.remove();
+        };
+    }
+    editor.appendChild(editorButtons);
+    document.body.appendChild(editor);
+}
+
+function openTaskEditor(task, parentArray, isNew) {
+    openEditor({
+        title: `${isNew ? "新增" : "編輯"}任務`,
+        fields: createTaskFields(task),
+        swatchId: task.swatchId,
+        onSwatchChange: swatchId => task.swatchId = swatchId,
+        isNew,
+        onSave: editor => {
+            execute(() => {
+                task.title = editor.querySelector("#edit-title").value.trim() || "（未命名）";
+                task.intervalDays = +editor.querySelector("#edit-interval").value || 0;
+                if (isNew && parentArray) parentArray.push(task);
+            });
+        },
+        onDelete: !isNew ? () => deleteTask(task) : null
+    });
+}
+function createTaskFields(task) {
+    const labelTitle = document.createElement("label");
+    labelTitle.textContent = "任務名稱：";
+    const inputTitle = document.createElement("input");
+    inputTitle.type = "text";
+    inputTitle.id = "edit-title";
+    inputTitle.value = task.title || "";
+    inputTitle.oninput = () => { task.title = inputTitle.value; };
+
+    const labelInterval = document.createElement("label");
+    labelInterval.textContent = "週期（天）：";
+    const inputInterval = document.createElement("input");
+    inputInterval.type = "number";
+    inputInterval.id = "edit-interval";
+    inputInterval.value = task.intervalDays || 7;
+    inputInterval.oninput = () => { task.intervalDays = +inputInterval.value; };
+
+    return [labelTitle, inputTitle, labelInterval, inputInterval];
+}
+
+function openMemoEditor(memo, index, isNew) {
+    memo = memo || newMemo();
+    openEditor({
+        title: `${isNew ? "新增" : "編輯"}備忘`,
+        fields: createMemoFields(memo),
+        swatchId: memo.swatchId,
+        onSwatchChange: swatchId => memo.swatchId = swatchId,
+        isNew,
+        onSave: editor => {
+            execute(() => {
+                memo.text = editor.querySelector("textarea").value.trim() || "（未命名）";
+                if (isNew) memos.push(memo);
+            });
+        },
+        onDelete: !isNew ? () => deleteMemo(index) : null
+    });
+}
+function createMemoFields(memo) {
     const label = document.createElement("label");
     label.textContent = "備忘內容：";
     const textarea = document.createElement("textarea");
     textarea.value = memo.text;
     textarea.rows = 5;
     textarea.style.width = "100%";
-    const labelColor = document.createElement("label");
-    labelColor.textContent = "底色：";
-    const swatchContainer = createColorSwatches(memo.swatchId, (btn, swatchId) => {
-        swatchContainer.querySelectorAll(".swatch").forEach(b => b.classList.remove("selected"));
-        btn.classList.add("selected");
-        memo.swatchId = swatchId;
-    });
-    const editorButtons = document.createElement("div");
-    editorButtons.className = "editor-buttons";
-    const saveBtn = document.createElement("button");
-    saveBtn.textContent = "儲存";
-    saveBtn.onclick = () => {
-        execute(() => {
-            memo.text = textarea.value.trim() || "（未命名）";
-            if (isNew) memos.push(memo);
-        });
-        editor.remove();
-    };
-    const cancelBtn = document.createElement("button");
-    cancelBtn.textContent = "取消";
-    cancelBtn.onclick = () => editor.remove();
-    editorButtons.append(saveBtn, cancelBtn);
-    editor.append(label, textarea, labelColor, swatchContainer, editorButtons);
-    document.body.appendChild(editor);
+    textarea.oninput = () => { memo.text = textarea.value; };
+    return [label, textarea];
 }
-function openListEditor(list) {
-    document.querySelector(".editor")?.remove();
-    const isNew = !list;
+
+function openListEditor(list, isNew) {
     list = list || newList();
-    const editor = document.createElement("div");
-    editor.className = "editor";
+    openEditor({
+        title: `${isNew ? "新增" : "編輯"}清單`,
+        fields: createListFields(list),
+        swatchId: list.swatchId,
+        onSwatchChange: swatchId => list.swatchId = swatchId,
+        isNew,
+        onSave: editor => {
+            execute(() => {
+                list.name = editor.querySelector("input[type='text']").value.trim() || "未命名清單";
+                list.startNumber = +editor.querySelectorAll("input[type='number']")[0].value || 1;
+                list.endNumber = +editor.querySelectorAll("input[type='number']")[1].value || 10;
+                if (isNew) lists.push(list);
+            });
+        },
+        onDelete: !isNew ? () => deleteList(list.id) : null
+    });
+}
+function createListFields(list) {
     const labelName = document.createElement("label");
     labelName.textContent = "清單名稱：";
     const inputName = document.createElement("input");
     inputName.type = "text";
     inputName.value = list.name;
+    inputName.oninput = () => { list.name = inputName.value; };
+
     const labelStart = document.createElement("label");
     labelStart.textContent = "開始編號：";
     const inputStart = document.createElement("input");
     inputStart.type = "number";
     inputStart.value = list.startNumber;
+    inputStart.oninput = () => { list.startNumber = +inputStart.value; };
+
     const labelEnd = document.createElement("label");
     labelEnd.textContent = "結束編號：";
     const inputEnd = document.createElement("input");
     inputEnd.type = "number";
     inputEnd.value = list.endNumber;
-    const labelColor = document.createElement("label");
-    labelColor.textContent = "底色：";
-    const swatchContainer = createColorSwatches(list.swatchId, (btn, swatchId) => {
-        swatchContainer.querySelectorAll(".swatch").forEach(b => b.classList.remove("selected"));
-        btn.classList.add("selected");
-        list.swatchId = swatchId;
-    });
-    const editorButtons = document.createElement("div");
-    editorButtons.className = "editor-buttons";
-    const saveBtn = document.createElement("button");
-    saveBtn.textContent = "儲存";
-    saveBtn.onclick = () => {
-        execute(() => {
-            list.name = inputName.value.trim() || "未命名清單";
-            list.startNumber = +inputStart.value || 1;
-            list.endNumber = +inputEnd.value || 10;
-            if (isNew) lists.push(list);
-        });
-        editor.remove();
-    };
-    const cancelBtn = document.createElement("button");
-    cancelBtn.textContent = "取消";
-    cancelBtn.onclick = () => editor.remove();
-    editorButtons.append(saveBtn, cancelBtn);
-    editor.append(labelName, inputName, labelStart, inputStart, labelEnd, inputEnd, labelColor, swatchContainer, editorButtons);
-    document.body.appendChild(editor);
+    inputEnd.oninput = () => { list.endNumber = +inputEnd.value; };
+
+    return [labelName, inputName, labelStart, inputStart, labelEnd, inputEnd];
 }
+
 function showToast(msg = "已儲存") {
     toast.textContent = msg;
     toast.classList.add("show");
@@ -655,7 +693,7 @@ function renderTreeRoot() {
     rootAddBtn.type = "button";
     rootAddBtn.onpointerdown = () => {
         const t = newTask();
-        openTaskEditor(t, tasks);
+        openTaskEditor(t, tasks, true);
     };
     treeRoot.appendChild(rootAddBtn);
 }
@@ -727,7 +765,7 @@ function createTaskLine(task, path) {
 
 function renderCalendar() {
     clearChildren(dateHead);
-    clearChildren(calBody);
+    clearChildren(calendarBody);
     const dates = generateDates();
     const dsArr = dates.map(formatDate);
     const todayStr = formatDate(today);
@@ -747,7 +785,7 @@ function renderCalendar() {
         const tr = createCalendarRow(task, dsArr, todayStr, colors);
         bodyFrag.appendChild(tr);
     });
-    calBody.appendChild(bodyFrag);
+    calendarBody.appendChild(bodyFrag);
 }
 function createCalendarRow(task, dsArr, todayStr, colors) {
     const tr = document.createElement("tr");
@@ -784,7 +822,7 @@ function createCalendarRow(task, dsArr, todayStr, colors) {
 
 function renderMemos() {
     clearChildren(memoList);
-    clearChildren(memoroot);
+    clearChildren(memoRoot);
     const ul = document.createElement("ul");
     ul.id = "memo-list";
     ul.className = "task-tree";
@@ -807,9 +845,9 @@ function renderMemos() {
     addBtn.className = "indent full-width-btn";
     addBtn.type = "button";
     addBtn.textContent = "➕ 新增備忘";
-    addBtn.onclick = () => openMemoEditor(newMemo(), memos.length);
-    memoroot.appendChild(ul);
-    memoroot.appendChild(addBtn);
+    addBtn.onclick = () => openMemoEditor(newMemo(), memos.length, true);
+    memoRoot.appendChild(ul);
+    memoRoot.appendChild(addBtn);
 }
 function createMemoLine(memo, index, colors) {
     const li = document.createElement("li");
@@ -829,7 +867,7 @@ function createMemoLine(memo, index, colors) {
     editBtn.className = "edit-btn";
     editBtn.title = "編輯備忘";
     createIcon("fa-pencil", editBtn);
-    editBtn.onclick = () => openMemoEditor(memo, index);
+    editBtn.onclick = () => openMemoEditor(memo, index, false);
 
     const deleteBtn = document.createElement("button");
     deleteBtn.className = "delete-btn";
@@ -845,7 +883,7 @@ function createMemoLine(memo, index, colors) {
 
 function renderLists() {
     clearChildren(listContainer);
-    clearChildren(listroot);
+    clearChildren(listRoot);
     const ul = document.createElement("ul");
     ul.id = "list-container";
     ul.className = "task-tree";
@@ -868,9 +906,9 @@ function renderLists() {
     addBtn.className = "indent full-width-btn";
     addBtn.type = "button";
     addBtn.textContent = "➕ 新增清單";
-    addBtn.onclick = () => openListEditor(newList());
-    listroot.appendChild(ul);
-    listroot.appendChild(addBtn);
+    addBtn.onclick = () => openListEditor(newList(), true);
+    listRoot.appendChild(ul);
+    listRoot.appendChild(addBtn);
 }
 function createListLine(list, index, colors) {
     const li = document.createElement("li");
@@ -899,7 +937,7 @@ function createListTitle(list) {
     editBtn.className = "edit-btn";
     editBtn.title = "編輯清單";
     createIcon("fa-pencil", editBtn);
-    editBtn.onclick = () => openListEditor(list);
+    editBtn.onclick = () => openListEditor(list, false);
     const clearBtn = document.createElement("button");
     clearBtn.className = "clear-btn";
     clearBtn.title = "清除所有完成";

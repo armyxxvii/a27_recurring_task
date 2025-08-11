@@ -267,7 +267,7 @@ table {
 
         table th.today, table td.today {
             border: 3px #080 solid;
-            background: #080d;
+/*            background: #080d;*/
         }
 
         table th.holiday, table td.holiday {
@@ -278,7 +278,7 @@ table {
 
         table th.today.holiday, table td.today.holiday {
             border: 3px #a00 solid;
-            background: #a00d;
+            background: #a007;
             color: #fff;
         }
 
