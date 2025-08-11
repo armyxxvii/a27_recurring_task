@@ -148,11 +148,11 @@ ul.task-tree {
 }
 
 .task-line {
-    padding: 0px 1px;
+    padding: 0px 3px;
     border: 0.5px solid #ddd;
     border-radius: 6px 0 0 6px;
-    height: 25px;
-    line-height: 16px;
+    min-height: 25px;
+    line-height: 21px;
     display: flex;
     align-items: center;
     gap: 3px;
@@ -166,7 +166,7 @@ ul.task-tree {
     font-size: 0.8rem;
     flex: 1;
     cursor: default;
-    white-space: nowrap;
+    white-space: pre-wrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }

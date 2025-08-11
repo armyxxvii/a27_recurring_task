@@ -556,9 +556,11 @@ function openMemoEditor(memo, index) {
     const label = document.createElement("label");
     label.textContent = "備忘內容：";
 
-    const input = document.createElement("input");
-    input.type = "text";
-    input.value = memo.text;
+    // 使用 <textarea> 替代 <input>
+    const textarea = document.createElement("textarea");
+    textarea.value = memo.text;
+    textarea.rows = 5; // 預設顯示 5 行
+    textarea.style.width = "100%"; // 設定寬度為 100%
 
     const labelColor = document.createElement("label");
     labelColor.textContent = "底色：";
@@ -575,7 +577,7 @@ function openMemoEditor(memo, index) {
     saveBtn.textContent = "儲存";
     saveBtn.onclick = () => {
         execute(() => {
-            memo.text = input.value.trim() || "（未命名）";
+            memo.text = textarea.value.trim() || "（未命名）";
             if (isNew) memos.push(memo);
         });
         editor.remove();
@@ -587,7 +589,7 @@ function openMemoEditor(memo, index) {
 
     editorButtons.append(saveBtn, cancelBtn);
 
-    editor.append(label, input, labelColor, swatchContainer, editorButtons);
+    editor.append(label, textarea, labelColor, swatchContainer, editorButtons);
     document.body.appendChild(editor);
 }
 function openListEditor(list) {
@@ -783,7 +785,7 @@ function renderTree(data, parentEl, path = []) {
 
         const titleSpan = document.createElement("span");
         titleSpan.className = "task-title";
-        titleSpan.textContent = `(${task.intervalDays}) ${task.title}`;
+        titleSpan.innerHTML = `<sup>${task.intervalDays}</sup> ${task.title}`;
 
         const ctr = document.createElement("span");
         ctr.className = "controls";
@@ -910,9 +912,11 @@ function renderMemos() {
         line.className = "task-line";
         line.style.background = colors[memo.swatchId] || "transparent";
 
+        // 使用 <span> 並設定 white-space: pre-wrap 來顯示多行文字
         const textSpan = document.createElement("span");
         textSpan.textContent = memo.text;
         textSpan.className = "task-title";
+        textSpan.style.margin = "3px";
 
         const editBtn = document.createElement("button");
         editBtn.className = "edit-btn";
