@@ -12,6 +12,8 @@ const listContainer = document.getElementById("list-container");
 const memoRoot = document.getElementById("memo-root");
 const memoList = document.getElementById("memo-list");
 
+const url = "https://script.google.com/macros/s/AKfycbxIc15slK9FtweWL_N-op8Mp2sJWTTpaHa9aaeKWnbzkOrA2sz-ZBKgfsLU8L54snrB/exec"
+
 const undoStack = [];
 const redoStack = [];
 const holidayDates = new Set();
@@ -36,139 +38,91 @@ const idMap = new Map();
 let tasks = [];
 let lists = [];
 let memos = [];
-let fileHandle = null;
-let currentFilename = "tasks.json";
-let downloadBtn = null;
 let today;
 let calendarStartDate = null;
 let calendarEndDate = null;
 let toggleSortableBtn;
 let isSortableEnabled = false;
 
+let currentUser = null;
+
 // ===========================
-// 2. File I/O: open, save
+// 2a. Google Sheets I/O
 // ===========================
-function checkFileSystemSupport() {
+function checkGoogleSheetsSupport() {
     const controls = document.getElementById("controls");
     clearChildren(controls);
 
-    if (window.showOpenFilePicker) {
-        const openBtn = document.createElement("button");
-        openBtn.textContent = "開啟任務 JSON";
-        openBtn.type = "button";
-        openBtn.onpointerdown = openFile;
-        controls.appendChild(openBtn);
-    } else {
-        const input = document.createElement("input");
-        input.type = "file";
-        input.accept = ".json";
-        input.onchange = inputFile;
-        controls.appendChild(input);
+    // 只顯示 Google Sheets 讀取按鈕
+    const openBtn = document.createElement("button");
+    openBtn.textContent = "從 Google Sheets 讀取資料";
+    openBtn.type = "button";
+    openBtn.onclick = fetchAllFromGoogleSheet;
+    controls.appendChild(openBtn);
 
-        downloadBtn = document.createElement("button");
-        downloadBtn.textContent = "下載任務檔";
-        downloadBtn.type = "button";
-        downloadBtn.onpointerdown = downloadFile;
-        downloadBtn.disabled = true;
-        controls.appendChild(downloadBtn);
-    }
+    const saveBtn = document.createElement("button");
+    saveBtn.textContent = "儲存到 Google Sheets";
+    saveBtn.type = "button";
+    saveBtn.onclick = saveAllToGoogleSheet;
+    controls.appendChild(saveBtn);
 }
-async function openFile() {
-    [fileHandle] = await window.showOpenFilePicker({
-        types: [{ description: "JSON", accept: { "application/json": [".json"] } }]
+
+// 讀取所有資料
+async function fetchAllFromGoogleSheet() {
+    if (!currentUser) return showLogin();
+    const res = await fetch(url + `?user=${encodeURIComponent(currentUser)}`, {
+        method: "GET",
+        headers: { "Content-Type": "text/plain;charset=utf-8" }
     });
-    const file = await fileHandle.getFile();
-    if (file) await loadFile(file);
-}
-async function inputFile(event) {
-    const file = event.target.files[0];
-    if (file) {
-        currentFilename = file.name;
-        await loadFile(file);
-        if (downloadBtn) downloadBtn.disabled = false;
-    }
-}
-async function loadFile(file) {
-    const text = await file.text();
-    let data = JSON.parse(text || "{}");
-
-    const headerTitle = document.querySelector("header h1");
-    if (headerTitle) headerTitle.textContent = file.name;
-
+    const data = await res.json();
+    // 根據 Google Apps Script 回傳格式解析
+    tasks = Array.isArray(data.tasks) ? data.tasks : [];
+    lists = Array.isArray(data.lists) ? data.lists : [];
+    memos = Array.isArray(data.memos) ? data.memos : [];
+    holidayDates.clear();
+    (data.holidays || []).forEach(d => holidayDates.add(d));
     if (data.calendarRange) {
         calendarStartDate = data.calendarRange.start ? parseDate(data.calendarRange.start) : null;
-        calendarStart.value = data.calendarRange.start;
         calendarEndDate = data.calendarRange.end ? parseDate(data.calendarRange.end) : null;
-        calendarEnd.value = data.calendarRange.end;
+        calendarStart.value = data.calendarRange.start || "";
+        calendarEnd.value = data.calendarRange.end || "";
     }
-
-    if (Array.isArray(data.tasks)) {
-        tasks = data.tasks;
-        holidayDates.clear();
-        (data.holidays || []).forEach(d => holidayDates.add(d));
-    } else {
-        tasks = [];
-        holidayDates.clear();
-    }
-
-    memos = Array.isArray(data.memos) ? data.memos : [];
-
-    // lists: 保持 doneNumbers 為 array
-    if (Array.isArray(data.lists)) {
-        lists = data.lists.map(list => ({
-            ...list,
-            doneNumbers: Array.isArray(list.doneNumbers) ? list.doneNumbers : []
-        }));
-    } else {
-        lists = [];
-    }
-
-    currentFilename = file.name || currentFilename;
     refreshAll();
-    showToast("已載入");
+    showToast("已從 Google Sheets 讀取");
 }
-async function saveFile() {
+
+// 儲存所有資料
+async function saveAllToGoogleSheet() {
+    if (!currentUser) return showLogin();
     lists.forEach(list => {
         if (!list.id) list.id = generateUniqueId();
     });
     sortDates();
     refreshAll();
-
-    if (fileHandle) {
-        const w = await fileHandle.createWritable();
-        await w.write(JSON.stringify(getPayload(), null, 2));
-        await w.close();
-        showToast("已儲存");
-    } else showToast("修改未儲存");
-}
-async function downloadFile() {
-    sortDates();
-    const blob = new Blob([JSON.stringify(getPayload(), null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = currentFilename.endsWith(".json") ? currentFilename : `${currentFilename}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    showToast("已下載");
+    const payload = getPayload();
+    await fetch(url + `?user=${encodeURIComponent(currentUser)}`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+        headers: { "Content-Type": "text/plain;charset=utf-8" }
+    });
+    showToast("已儲存到 Google Sheets");
 }
 function getPayload() {
     return {
-        tasks,
+        user: currentUser,
         holidays: Array.from(holidayDates),
         calendarRange: {
             start: calendarStartDate ? formatDate(calendarStartDate) : null,
             end: calendarEndDate ? formatDate(calendarEndDate) : null
         },
+        tasks,
         memos,
         lists
     };
 }
 
 // ===========================
-// 撤銷 / 重做
+// 2b. 撤銷 / 重做
 // ===========================
 function getCurrentState() {
     return {
@@ -199,7 +153,7 @@ function undo() {
     calendarStartDate = previousState.calendarStartDate;
     calendarEndDate = previousState.calendarEndDate;
     showToast("已撤銷");
-    saveFile();
+    saveAllToGoogleSheet();
 }
 function redo() {
     if (redoStack.length === 0) {
@@ -216,13 +170,13 @@ function redo() {
     calendarStartDate = nextState.calendarStartDate;
     calendarEndDate = nextState.calendarEndDate;
     showToast("已重做");
-    saveFile();
+    saveAllToGoogleSheet();
 }
-/** 通用函式：保存狀態、執行功能並保存文件 */
+/** 通用函式：保存狀態、執行功能並保存 Google Sheets */
 function execute(action) {
     saveState();
     action();
-    saveFile();
+    saveAllToGoogleSheet();
 }
 
 // ===========================
@@ -616,6 +570,76 @@ function createListFields(list) {
     return [labelName, inputName, labelStart, inputStart, labelEnd, inputEnd];
 }
 
+
+function showLogin() {
+    if (currentUser) {
+        checkGoogleSheetsSupport();
+        return;
+    }
+    // 移除舊登入視窗
+    document.querySelector(".editor")?.remove();
+
+    // 建立 editor 樣式的登入視窗
+    const editor = document.createElement("div");
+    editor.className = "editor login-modal"; // 可加 login-modal 方便 CSS 控制遮罩
+
+    // 遮罩（可用 .login-modal 控制全螢幕）
+    editor.tabIndex = -1;
+
+    // 標題
+    const h2 = document.createElement("h2");
+    h2.textContent = "登入 / 建立新帳號";
+    editor.appendChild(h2);
+
+    // 欄位
+    const label = document.createElement("label");
+    label.textContent = "暱稱（帳號）：";
+    const input = document.createElement("input");
+    input.type = "text";
+    input.id = "login-user";
+    input.autofocus = true;
+    label.appendChild(input);
+    editor.appendChild(label);
+
+    // 按鈕區
+    const btnBar = document.createElement("div");
+    btnBar.className = "editor-buttons";
+    const loginBtn = document.createElement("button");
+    loginBtn.textContent = "登入";
+    loginBtn.type = "button";
+    btnBar.appendChild(loginBtn);
+    editor.appendChild(btnBar);
+
+    document.body.appendChild(editor);
+
+    // 讓 Enter 也能登入
+    input.addEventListener("keydown", e => {
+        if (e.key === "Enter") loginBtn.click();
+    });
+
+    loginBtn.onclick = async () => {
+        const user = input.value.trim();
+        if (!user) {
+            showToast("請輸入暱稱");
+            return;
+        }
+        // 註冊/登入
+        const res = await fetch(url + `?action=register&user=${encodeURIComponent(user)}`, {
+            method: "GET",
+            headers: { "Content-Type": "text/plain;charset=utf-8" }
+        });
+        const data = await res.json();
+        if (data.success) {
+            currentUser = user;
+            editor.remove();
+            checkGoogleSheetsSupport();
+            fetchAllFromGoogleSheet();
+            showToast("登入成功：" + user);
+        } else {
+            showToast("登入失敗，請重試");
+        }
+    };
+}
 function showToast(msg = "已儲存") {
     toast.textContent = msg;
     toast.classList.add("show");
@@ -979,7 +1003,7 @@ function createListTable(list) {
 // ===========================
 // 5. Event delegation
 // ===========================
-document.addEventListener("DOMContentLoaded", checkFileSystemSupport);
+document.addEventListener("DOMContentLoaded", showLogin);
 dateHead.addEventListener("click", toggleHoliday);
 treeRoot.addEventListener("click", toggleTaskCollapse);
 document.getElementById("apply-range-btn").addEventListener("click", updateDateRange);
