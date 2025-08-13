@@ -422,6 +422,7 @@ function createColorSwatches(selectedSwatchId, onpointerdown) {
  */
 function openEditor(options) {
     document.querySelector(".editor")?.remove();
+    showPageDim();
     const editor = document.createElement("div");
     editor.className = "editor";
 
@@ -448,26 +449,48 @@ function openEditor(options) {
     // 按鈕區
     const editorButtons = document.createElement("div");
     editorButtons.className = "editor-buttons";
-    const saveBtn = document.createElement("button");
-    saveBtn.textContent = "儲存";
-    const cancelBtn = document.createElement("button");
-    cancelBtn.textContent = "取消";
-    editorButtons.append(saveBtn, cancelBtn);
 
-    saveBtn.onclick = () => {
-        options.onSave(editor);
-        editor.remove();
-    };
-    cancelBtn.onclick = () => editor.remove();
-
-    if (!options.isNew && typeof options.onDelete === "function") {
-        const deleteBtn = document.createElement("button");
-        deleteBtn.textContent = "刪除";
-        editorButtons.append(deleteBtn);
-        deleteBtn.onclick = () => {
-            if (options.onDelete() === true) editor.remove();
+    if (Array.isArray(options.buttons) && options.buttons.length > 0) {
+        // 自訂按鈕模式
+        options.buttons.forEach(btnOpt => {
+            const btn = document.createElement("button");
+            btn.textContent = btnOpt.text;
+            btn.type = btnOpt.type || "button";
+            btn.onclick = () => btnOpt.onClick(editor);
+            editorButtons.appendChild(btn);
+        });
+    } else {
+        // 預設儲存/取消/刪除
+        const saveBtn = document.createElement("button");
+        saveBtn.textContent = "儲存";
+        saveBtn.onclick = () => {
+            options.onSave(editor);
+            editor.remove();
+            hidePageDim();
         };
+        editorButtons.append(saveBtn);
+
+        if (!options.isNew && typeof options.onDelete === "function") {
+            const deleteBtn = document.createElement("button");
+            deleteBtn.textContent = "刪除";
+            deleteBtn.onclick = () => {
+                if (options.onDelete() === true) {
+                    editor.remove();
+                    hidePageDim();
+                }
+            };
+            editorButtons.append(deleteBtn);
+        }
+
+        const cancelBtn = document.createElement("button");
+        cancelBtn.textContent = "取消";
+        cancelBtn.onclick = () => {
+            editor.remove();
+            hidePageDim();
+        };
+        editorButtons.append(cancelBtn);
     }
+
     editor.appendChild(editorButtons);
     document.body.appendChild(editor);
 }
@@ -587,21 +610,6 @@ function showLogin() {
         checkGoogleSheetsSupport();
         return;
     }
-    // 移除舊登入視窗
-    document.querySelector(".editor")?.remove();
-
-    // 建立 editor 樣式的登入視窗
-    const editor = document.createElement("div");
-    editor.className = "editor login-modal"; // 可加 login-modal 方便 CSS 控制遮罩
-
-    // 遮罩（可用 .login-modal 控制全螢幕）
-    editor.tabIndex = -1;
-
-    // 標題
-    const h2 = document.createElement("h2");
-    h2.textContent = "登入 / 建立新帳號";
-    editor.appendChild(h2);
-
     // 欄位
     const label = document.createElement("label");
     label.textContent = "暱稱（帳號）：";
@@ -610,46 +618,48 @@ function showLogin() {
     input.id = "login-user";
     input.autofocus = true;
     label.appendChild(input);
-    editor.appendChild(label);
 
-    // 按鈕區
-    const btnBar = document.createElement("div");
-    btnBar.className = "editor-buttons";
-    const loginBtn = document.createElement("button");
-    loginBtn.textContent = "登入";
-    loginBtn.type = "button";
-    btnBar.appendChild(loginBtn);
-    editor.appendChild(btnBar);
-
-    document.body.appendChild(editor);
+    openEditor({
+        title: "登入 / 建立新帳號",
+        fields: [label],
+        isNew: true,
+        buttons: [
+            {
+                text: "登入",
+                onClick: async (editor) => {
+                    const user = input.value.trim();
+                    if (!user) {
+                        showToast("請輸入暱稱");
+                        return;
+                    }
+                    // 註冊/登入
+                    const res = await fetch(url + `?action=register&user=${encodeURIComponent(user)}`, {
+                        method: "GET",
+                        headers: { "Content-Type": "text/plain;charset=utf-8" }
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        currentUser = user;
+                        checkGoogleSheetsSupport();
+                        fetchAllFromGoogleSheet();
+                        editor.remove();
+                        showToast("登入成功：" + user);
+                    } else {
+                        showToast("登入失敗，請重試");
+                    }
+                }
+            }
+        ]
+    });
 
     // 讓 Enter 也能登入
     input.addEventListener("keydown", e => {
-        if (e.key === "Enter") loginBtn.click();
+        if (e.key === "Enter") {
+            // 觸發登入按鈕
+            const loginBtn = document.querySelector(".editor .editor-buttons button");
+            if (loginBtn) loginBtn.click();
+        }
     });
-
-    loginBtn.onclick = async () => {
-        const user = input.value.trim();
-        if (!user) {
-            showToast("請輸入暱稱");
-            return;
-        }
-        // 註冊/登入
-        const res = await fetch(url + `?action=register&user=${encodeURIComponent(user)}`, {
-            method: "GET",
-            headers: { "Content-Type": "text/plain;charset=utf-8" }
-        });
-        const data = await res.json();
-        if (data.success) {
-            currentUser = user;
-            editor.remove();
-            checkGoogleSheetsSupport();
-            fetchAllFromGoogleSheet();
-            showToast("登入成功：" + user);
-        } else {
-            showToast("登入失敗，請重試");
-        }
-    };
 }
 function showToast(msg = "已儲存") {
     toast.textContent = msg;
