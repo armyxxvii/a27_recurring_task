@@ -12,7 +12,7 @@ const listContainer = document.getElementById("list-container");
 const memoRoot = document.getElementById("memo-root");
 const memoList = document.getElementById("memo-list");
 
-const url = "https://script.google.com/macros/s/AKfycbxIc15slK9FtweWL_N-op8Mp2sJWTTpaHa9aaeKWnbzkOrA2sz-ZBKgfsLU8L54snrB/exec"
+const url = "https://script.google.com/macros/s/AKfycbxPcggbgGkQuWVebjOq53HifOJfInpgSDiYnpMfE6oxY_M8PAlBUeclKwnDW5BuxbAO/exec"
 
 const undoStack = [];
 const redoStack = [];
@@ -66,46 +66,55 @@ function checkGoogleSheetsSupport() {
     saveBtn.onclick = saveAllToGoogleSheet;
     controls.appendChild(saveBtn);
 }
-
 // 讀取所有資料
 async function fetchAllFromGoogleSheet() {
     if (!currentUser) return showLogin();
-    const res = await fetch(url + `?user=${encodeURIComponent(currentUser)}`, {
-        method: "GET",
-        headers: { "Content-Type": "text/plain;charset=utf-8" }
-    });
-    const data = await res.json();
-    // 根據 Google Apps Script 回傳格式解析
-    tasks = Array.isArray(data.tasks) ? data.tasks : [];
-    lists = Array.isArray(data.lists) ? data.lists : [];
-    memos = Array.isArray(data.memos) ? data.memos : [];
-    holidayDates.clear();
-    (data.holidays || []).forEach(d => holidayDates.add(d));
-    if (data.calendarRange) {
-        calendarStartDate = data.calendarRange.start ? parseDate(data.calendarRange.start) : null;
-        calendarEndDate = data.calendarRange.end ? parseDate(data.calendarRange.end) : null;
-        calendarStart.value = data.calendarRange.start || "";
-        calendarEnd.value = data.calendarRange.end || "";
+    showPageDim();
+    try {
+        const res = await fetch(url + `?user=${encodeURIComponent(currentUser)}`, {
+            method: "GET",
+            headers: { "Content-Type": "text/plain;charset=utf-8" }
+        });
+        const data = await res.json();
+        tasks = Array.isArray(data.tasks) ? data.tasks : [];
+        lists = Array.isArray(data.lists) ? data.lists : [];
+        memos = Array.isArray(data.memos) ? data.memos : [];
+        holidayDates.clear();
+        (data.holidays || []).forEach(d => holidayDates.add(d));
+        if (data.calendarRange) {
+            calendarStartDate = data.calendarRange.start ? parseDate(data.calendarRange.start) : null;
+            calendarEndDate = data.calendarRange.end ? parseDate(data.calendarRange.end) : null;
+            calendarStart.value = data.calendarRange.start || "";
+            calendarEnd.value = data.calendarRange.end || "";
+        }
+        refreshAll();
+        document.body.classList.remove("unsaved");
+        showToast("已從 Google Sheets 讀取");
+    } finally {
+        hidePageDim();
     }
-    refreshAll();
-    showToast("已從 Google Sheets 讀取");
 }
-
 // 儲存所有資料
 async function saveAllToGoogleSheet() {
     if (!currentUser) return showLogin();
-    lists.forEach(list => {
-        if (!list.id) list.id = generateUniqueId();
-    });
-    sortDates();
-    refreshAll();
-    const payload = getPayload();
-    await fetch(url + `?user=${encodeURIComponent(currentUser)}`, {
-        method: "POST",
-        body: JSON.stringify(payload),
-        headers: { "Content-Type": "text/plain;charset=utf-8" }
-    });
-    showToast("已儲存到 Google Sheets");
+    showPageDim();
+    try {
+        lists.forEach(list => {
+            if (!list.id) list.id = generateUniqueId();
+        });
+        sortDates();
+        refreshAll();
+        const payload = getPayload();
+        await fetch(url + `?user=${encodeURIComponent(currentUser)}`, {
+            method: "POST",
+            body: JSON.stringify(payload),
+            headers: { "Content-Type": "text/plain;charset=utf-8" }
+        });
+        document.body.classList.remove("unsaved");
+        showToast("已儲存到 Google Sheets");
+    } finally {
+        hidePageDim();
+    }
 }
 function getPayload() {
     return {
@@ -172,11 +181,13 @@ function redo() {
     showToast("已重做");
     saveAllToGoogleSheet();
 }
-/** 通用函式：保存狀態、執行功能並保存 Google Sheets */
+/** 通用函式：保存狀態、執行功能並刷新畫面 */
 function execute(action) {
     saveState();
     action();
-    saveAllToGoogleSheet();
+    refreshAll();
+    document.body.classList.add("unsaved");
+    //saveAllToGoogleSheet();
 }
 
 // ===========================
@@ -644,6 +655,18 @@ function showToast(msg = "已儲存") {
     toast.textContent = msg;
     toast.classList.add("show");
     setTimeout(() => toast.classList.remove("show"), 2000);
+}
+
+function showPageDim() {
+    if (!document.getElementById("page-dim-overlay")) {
+        const overlay = document.createElement("div");
+        overlay.id = "page-dim-overlay";
+        overlay.className = "page-dim-overlay";
+        document.body.appendChild(overlay);
+    }
+}
+function hidePageDim() {
+    document.getElementById("page-dim-overlay")?.remove();
 }
 
 // ===========================
