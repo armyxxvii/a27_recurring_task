@@ -49,23 +49,6 @@ let currentUser = null;
 // ===========================
 // 2a. Google Sheets I/O
 // ===========================
-function checkGoogleSheetsSupport() {
-    const controls = document.getElementById("controls");
-    clearChildren(controls);
-
-    // 只顯示 Google Sheets 讀取按鈕
-    const openBtn = document.createElement("button");
-    openBtn.textContent = "從 Google Sheets 讀取資料";
-    openBtn.type = "button";
-    openBtn.onclick = fetchAllFromGoogleSheet;
-    controls.appendChild(openBtn);
-
-    const saveBtn = document.createElement("button");
-    saveBtn.textContent = "儲存到 Google Sheets";
-    saveBtn.type = "button";
-    saveBtn.onclick = saveAllToGoogleSheet;
-    controls.appendChild(saveBtn);
-}
 // 讀取所有資料
 async function fetchAllFromGoogleSheet() {
     if (!currentUser) return showLogin();
@@ -187,7 +170,6 @@ function execute(action) {
     action();
     refreshAll();
     document.body.classList.add("unsaved");
-    //saveAllToGoogleSheet();
 }
 
 // ===========================
@@ -607,7 +589,7 @@ function createListFields(list) {
 
 function showLogin() {
     if (currentUser) {
-        checkGoogleSheetsSupport();
+        renderControls();
         return;
     }
     // 欄位
@@ -640,9 +622,9 @@ function showLogin() {
                     const data = await res.json();
                     if (data.success) {
                         currentUser = user;
-                        checkGoogleSheetsSupport();
-                        fetchAllFromGoogleSheet();
+                        renderControls();
                         editor.remove();
+                        fetchAllFromGoogleSheet();
                         showToast("登入成功：" + user);
                     } else {
                         showToast("登入失敗，請重試");
@@ -735,6 +717,39 @@ function toggleSortable() {
 // ===========================
 // 4b. Render
 // ===========================
+function renderControls() {
+    const controls = document.getElementById("controls");
+    clearChildren(controls);
+
+    const undoBtn = document.createElement("button");
+    undoBtn.title = "撤銷";
+    undoBtn.type = "button";
+    createIcon("fa-rotate-left", undoBtn);
+    undoBtn.onclick = undo;
+    controls.appendChild(undoBtn);
+
+    const redoBtn = document.createElement("button");
+    redoBtn.title = "重做";
+    redoBtn.type = "button";
+    createIcon("fa-rotate-right", redoBtn);
+    redoBtn.onclick = redo;
+    controls.appendChild(redoBtn);
+
+    const openBtn = document.createElement("button");
+    openBtn.title = "從 Google Sheets 讀取資料";
+    openBtn.type = "button";
+    createIcon("fa-cloud-arrow-down", openBtn);
+    openBtn.onclick = fetchAllFromGoogleSheet;
+    controls.appendChild(openBtn);
+
+    const saveBtn = document.createElement("button");
+    saveBtn.title = "儲存到 Google Sheets";
+    saveBtn.type = "button";
+    createIcon("fa-cloud-arrow-up", saveBtn);
+    saveBtn.onclick = saveAllToGoogleSheet;
+    controls.appendChild(saveBtn);
+}
+
 function renderTreeRoot() {
     clearChildren(treeRoot);
     toggleSortableBtn = document.createElement("button");
@@ -1041,5 +1056,3 @@ dateHead.addEventListener("click", toggleHoliday);
 treeRoot.addEventListener("click", toggleTaskCollapse);
 document.getElementById("apply-range-btn").addEventListener("click", updateDateRange);
 document.getElementById("calendar-table").addEventListener("click", toggleComplete);
-document.getElementById("undo-btn").addEventListener("click", undo);
-document.getElementById("redo-btn").addEventListener("click", redo);

@@ -11,6 +11,7 @@ body {
     font-family: sans-serif;
     background: #f5f5f5;
 }
+
     body.unsaved {
         background: #fc7 !important;
     }
@@ -41,19 +42,6 @@ button i {
         .container button:hover {
             background: #666;
         }
-
-.title-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap; /* RWD */
-}
-
-    .title-bar sub,
-    .title-bar sup,
-    .title-bar small {
-        font-size: 0.8rem;
-    }
 
 .indent {
     margin-left: 0.5rem;
@@ -92,11 +80,38 @@ h6 {
     font-size: 0.8rem;
 }
 
+.title-bar {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+}
+
+    .title-bar button {
+        height: 2rem;
+        width: 2rem;
+        font-size: 1.2rem;
+        line-height: 1.2rem;
+        padding: 0;
+    }
+
+    .title-bar sub,
+    .title-bar sup,
+    .title-bar small {
+        font-size: 0.8rem;
+    }
+
 #controls {
     display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.7rem;
 }
+
+    #controls button {
+        width: 3rem;
+        height: 1.5rem;
+        font-size: 1.2rem;
+    }
 
 /* ===========================
    全寬度按鈕
@@ -270,7 +285,7 @@ table {
 
         table th.today, table td.today {
             border: 3px #080 solid;
-/*            background: #080d;*/
+            /*            background: #080d;*/
         }
 
         table th.holiday, table td.holiday {
@@ -328,6 +343,7 @@ table {
     opacity: 0;
     transition: opacity 0.4s;
 }
+
     #save-toast.show {
         opacity: 1;
     }
@@ -335,7 +351,10 @@ table {
 .page-dim-overlay {
     position: fixed;
     z-index: 9999;
-    top: 0; left: 0; right: 0; bottom: 0;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     background: rgba(0,0,0,0.5);
     backdrop-filter: blur(3px);
     pointer-events: all;
