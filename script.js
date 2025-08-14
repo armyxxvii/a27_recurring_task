@@ -87,10 +87,9 @@ async function saveAllToGoogleSheet() {
         });
         sortDates();
         refreshAll();
-        const payload = getPayload();
         await fetch(url + `?user=${encodeURIComponent(currentUser)}`, {
             method: "POST",
-            body: JSON.stringify(payload),
+            body: JSON.stringify(getPayload()),
             headers: { "Content-Type": "text/plain;charset=utf-8" }
         });
         document.body.classList.remove("unsaved");
@@ -145,7 +144,8 @@ function undo() {
     calendarStartDate = previousState.calendarStartDate;
     calendarEndDate = previousState.calendarEndDate;
     showToast("已撤銷");
-    saveAllToGoogleSheet();
+    refreshAll();
+    document.body.classList.add("unsaved");
 }
 function redo() {
     if (redoStack.length === 0) {
@@ -162,7 +162,8 @@ function redo() {
     calendarStartDate = nextState.calendarStartDate;
     calendarEndDate = nextState.calendarEndDate;
     showToast("已重做");
-    saveAllToGoogleSheet();
+    refreshAll();
+    document.body.classList.add("unsaved");
 }
 /** 通用函式：保存狀態、執行功能並刷新畫面 */
 function execute(action) {
@@ -622,10 +623,10 @@ function showLogin() {
                     const data = await res.json();
                     if (data.success) {
                         currentUser = user;
-                        renderControls();
-                        editor.remove();
-                        fetchAllFromGoogleSheet();
                         showToast("登入成功：" + user);
+                        editor.remove();
+                        renderControls();
+                        fetchAllFromGoogleSheet();
                     } else {
                         showToast("登入失敗，請重試");
                     }
