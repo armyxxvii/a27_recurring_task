@@ -327,6 +327,7 @@ function toggleComplete(event) {
         const i = found.completionDates.indexOf(date);
         if (i >= 0) found.completionDates.splice(i, 1);
         else found.completionDates.push(date);
+        sortDates();
     });
 }
 
