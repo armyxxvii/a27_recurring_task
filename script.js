@@ -34,6 +34,11 @@ const colors = [
     "#fb5",     // 橘茶／溫和
 ];
 const idMap = new Map();
+const rootTask = {
+    title: "ROOT",
+    path: [0],
+    children: []
+};
 
 let tasks = [];
 let lists = [];
@@ -59,7 +64,7 @@ async function fetchAllFromGoogleSheet() {
             headers: { "Content-Type": "text/plain;charset=utf-8" }
         });
         const data = await res.json();
-        tasks = Array.isArray(data.tasks) ? data.tasks : [];
+        rootTask.children = Array.isArray(data.tasks) ? data.tasks : [];
         lists = Array.isArray(data.lists) ? data.lists : [];
         memos = Array.isArray(data.memos) ? data.memos : [];
         holidayDates.clear();
@@ -106,7 +111,7 @@ function getPayload() {
             start: calendarStartDate ? formatDate(calendarStartDate) : null,
             end: calendarEndDate ? formatDate(calendarEndDate) : null
         },
-        tasks,
+        tasks: rootTask.children,
         memos,
         lists
     };
@@ -117,7 +122,7 @@ function getPayload() {
 // ===========================
 function getCurrentState() {
     return {
-        tasks: JSON.parse(JSON.stringify(tasks)),
+        tasks: JSON.parse(JSON.stringify(rootTask.children)),
         lists: JSON.parse(JSON.stringify(lists)),
         memos: JSON.parse(JSON.stringify(memos)),
         holidayDates: new Set(holidayDates),
@@ -136,7 +141,7 @@ function undo() {
     }
     const previousState = undoStack.pop();
     redoStack.push(getCurrentState());
-    tasks = previousState.tasks;
+    rootTask.children = previousState.tasks;
     lists = previousState.lists;
     memos = previousState.memos;
     holidayDates.clear();
@@ -154,7 +159,7 @@ function redo() {
     }
     const nextState = redoStack.pop();
     undoStack.push(getCurrentState());
-    tasks = nextState.tasks;
+    rootTask.children = nextState.tasks;
     lists = nextState.lists;
     memos = nextState.memos;
     holidayDates.clear();
@@ -199,7 +204,7 @@ function sortDates() {
             if (task.children?.length) recurSort(task.children);
         });
     }
-    recurSort(tasks);
+    recurSort(rootTask.children);
 }
 function diffDays(task, prevCompDate, targetDate) {
     const last = parseDate(prevCompDate);
@@ -245,7 +250,7 @@ function deleteTask(task) {
     if (confirm("確定要刪除這個任務？")) {
         execute(() => {
             const { parent, index } = getTaskByPath(path);
-            parent.splice(index, 1);
+            parent.children.splice(index, 1);
         });
         return true;
     }
@@ -253,11 +258,18 @@ function deleteTask(task) {
 }
 function buildIdMap(list) {
     idMap.clear();
+    if (!Array.isArray(list)) return;
     const stack = [...list];
     while (stack.length) {
         const task = stack.pop();
-        idMap.set(task.id, task);
-        if (task.children?.length) stack.push(...task.children);
+        // 檢查 id 是否存在
+        if (task && typeof task.id !== "undefined") {
+            idMap.set(task.id, task);
+        }
+        // children 必須是陣列才展開
+        if (Array.isArray(task?.children) && task.children.length > 0) {
+            stack.push(...task.children);
+        }
     }
 }
 function flattenTasks(data, parentPath = [], visible = true) {
@@ -273,21 +285,29 @@ function flattenTasks(data, parentPath = [], visible = true) {
     return list;
 }
 function getTaskByPath(path) {
-    let ref = tasks;
-    for (let i = 0; i < path.length - 1; i++) ref = ref[path[i]].children;
-    return {
-        parent: ref,
-        index: path[path.length - 1],
-        task: ref[path[path.length - 1]]
+    const result = {
+        parent: null,
+        index: path[0],
+        task: rootTask,
     };
+
+    for (let i = 1; i < path.length; i++) {
+        result.parent = result.task;
+        result.index = path[i];
+        result.task = result.parent.children[result.index];
+    }
+
+    //console.log("Getting task by path:", path, "Result:", result); // 調試輸出
+    return result;
 }
-function findTaskPath(target, data = tasks, path = []) {
-    for (let i = 0; i < data.length; i++) {
-        const t = data[i];
+function findTaskPath(target, data = rootTask, path = [0]) {
+    const child = data.children;
+    for (let i = 0; i < child.length; i++) {
+        const t = child[i];
         const currentPath = [...path, i];
         if (t === target) return currentPath;
         if (Array.isArray(t.children)) {
-            const childPath = findTaskPath(target, t.children, currentPath);
+            const childPath = findTaskPath(target, t, currentPath);
             if (childPath) return childPath;
         }
     }
@@ -394,16 +414,16 @@ function createColorSwatches(selectedSwatchId, onpointerdown) {
     return container;
 }
 /**
- * 開啟編輯器視窗。
- * @param {Object} options - 編輯器選項。
- * @param {string} [options.title] - 編輯器標題。
- * @param {HTMLElement[]} options.fields - 欄位元素陣列。
- * @param {number} [options.swatchId] - 預設選取的顏色索引。
- * @param {function} [options.onSwatchChange] - 顏色選擇變更時的回呼。
- * @param {function} options.onSave - 儲存時的回呼，參數為編輯器元素。
- * @param {function} [options.onDelete] - 刪除時的回呼。
- * @param {boolean} options.isNew - 是否為新增模式。
- */
+* 開啟編輯器視窗。
+* @param {Object} options - 編輯器選項。
+* @param {string} [options.title] - 編輯器標題。
+* @param {HTMLElement[]} options.fields - 欄位元素陣列。
+* @param {number} [options.swatchId] - 預設選取的顏色索引。
+* @param {function} [options.onSwatchChange] - 顏色選擇變更時的回呼。
+* @param {function} options.onSave - 儲存時的回呼，參數為編輯器元素。
+* @param {function} [options.onDelete] - 刪除時的回呼。
+* @param {boolean} options.isNew - 是否為新增模式。
+*/
 function openEditor(options) {
     document.querySelector(".editor")?.remove();
     showPageDim();
@@ -672,7 +692,7 @@ function refreshAll() {
         scrollPositions.set(el.id, el.scrollLeft);
     });
     today = parseDate(new Date());
-    buildIdMap(tasks);
+    buildIdMap(rootTask.children);
     renderTreeRoot();
     renderCalendar();
     renderMemos();
@@ -760,48 +780,67 @@ function renderTreeRoot() {
     toggleSortableBtn.className = "indent full-width-btn";
     toggleSortableBtn.type = "button";
     refreshToggleSortableBtn();
-    renderTree(tasks, treeRoot);
+    renderTree(rootTask.children, treeRoot);
     const rootAddBtn = document.createElement("button");
     rootAddBtn.className = "indent full-width-btn";
     rootAddBtn.textContent = "➕ 新增任務";
     rootAddBtn.type = "button";
     rootAddBtn.onpointerdown = () => {
         const t = newTask();
-        openTaskEditor(t, tasks, true);
+        openTaskEditor(t, rootTask.children, true);
     };
     treeRoot.appendChild(rootAddBtn);
 }
-function renderTree(data, parentEl, path = []) {
+function renderTree(data, parentEl, path = [0]) {
     const ul = document.createElement("ul");
     ul.className = "task-tree";
+
     data.forEach((task, i) => {
-        const li = document.createElement("li");
-        li.className = "task-node " + (task.collapsed ? "collapsed" : "expanded");
-        li.dataset.path = [...path, i].join(",");
-        const line = createTaskLine(task, [...path, i]);
-        li.appendChild(line);
+        const nodePath = [...path, i];
+        const li = createTaskNode(task, nodePath);
+
         if (task.children?.length && !task.collapsed) {
-            renderTree(task.children, li, [...path, i]);
+            renderTree(task.children, li, nodePath);
         }
         ul.appendChild(li);
     });
+
     ul.sortableInstance = new Sortable(ul, {
+        group: "nested",
         animation: 150,
+        fallbackOnBody: true,
+        swapThreshold: 0.65,
         handle: ".task-title",
         disabled: !isSortableEnabled,
         onEnd(evt) {
+            const fromPath = evt.item.dataset.path.split(",").map(Number);
+            const toParentPath = evt.to.parentElement.dataset.path
+                ? evt.to.parentElement.dataset.path.split(",").map(Number)
+                : [0];
+
+            // 防止將任務拖曳到自己的子孫節點
+            if (
+                toParentPath.length >= fromPath.length &&
+                toParentPath.slice(0, fromPath.length).every((v, i) => v === fromPath[i])
+            ) {
+                showToast("無法將任務拖曳到自己的子孫節點");
+                return;
+            }
+
             execute(() => {
-                const li = evt.item.closest(".task-node");
-                const parentPath = li.dataset.path.split(",").map(n => +n);
-                const { parent } = getTaskByPath(parentPath);
-                const moved = parent.splice(evt.oldIndex, 1)[0];
-                parent.splice(evt.newIndex, 0, moved);
+                const { parent: fromParent, index: fromIdx, task: movedTask } = getTaskByPath(fromPath);
+                const { task: toParent } = getTaskByPath(toParentPath);
+
+                //console.log("From:", fromPath, "To parent:", toParentPath, "index:", evt.newIndex); // 調試輸出
+                fromParent.children.splice(fromIdx, 1);
+                toParent.children.splice(evt.newIndex, 0, movedTask);
             });
         }
     });
+
     parentEl.appendChild(ul);
 }
-function createTaskLine(task, path) {
+function createTaskLine(task) {
     const line = document.createElement("div");
     line.className = "task-line";
     line.style.background = colors[task.swatchId] || "transparent";
@@ -836,6 +875,19 @@ function createTaskLine(task, path) {
     line.append(toggleBtn, titleSpan, ctr);
     return line;
 }
+function createTaskNode(task, path) {
+    if (!task || typeof task !== "object") {
+        console.error("Invalid task:", task);
+        return document.createElement("li");
+    }
+
+    const node = document.createElement("li");
+    node.className = "task-node " + (task.collapsed ? "collapsed" : "expanded");
+    node.dataset.path = path.join(",");
+    node.appendChild(createTaskLine(task));
+
+    return node;
+}
 
 function renderCalendar() {
     clearChildren(dateHead);
@@ -855,7 +907,7 @@ function renderCalendar() {
     });
     dateHead.appendChild(headFrag);
     const bodyFrag = document.createDocumentFragment();
-    flattenTasks(tasks).forEach(task => {
+    flattenTasks(rootTask.children).forEach(task => {
         const tr = createCalendarRow(task, dsArr, todayStr, colors);
         bodyFrag.appendChild(tr);
     });

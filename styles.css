@@ -13,7 +13,7 @@ body {
 }
 
     body.unsaved {
-        background: #fc7 !important;
+        background: #fff288  !important;
     }
 
 button i {
@@ -284,8 +284,8 @@ table {
     }
 
         table th.today, table td.today {
-            border: 3px #080 solid;
-            /*            background: #080d;*/
+            border: 3px #0d0 solid;
+            background: #0d02;
         }
 
         table th.holiday, table td.holiday {
@@ -302,7 +302,7 @@ table {
 
     /* 狀態格顏色 */
     table .done-past {
-        background: #9f8e;
+        background: #9f8e !important;
     }
 
     table .done-future {
@@ -312,8 +312,8 @@ table {
     }
 
     table .pending {
-        background: #2322;
-        color: #9f8;
+        /*background: #2322;*/
+        color: #080;
     }
 
     table .overdue {
