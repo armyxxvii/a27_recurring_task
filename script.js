@@ -637,6 +637,7 @@ function showLogin() {
                         return;
                     }
                     // 註冊/登入
+                    editor.style.display = "none";
                     const res = await fetch(url + `?action=register&user=${encodeURIComponent(user)}`, {
                         method: "GET",
                         headers: { "Content-Type": "text/plain;charset=utf-8" }
@@ -649,6 +650,7 @@ function showLogin() {
                         renderControls();
                         fetchAllFromGoogleSheet();
                     } else {
+                        editor.style.display = "block";
                         showToast("登入失敗，請重試");
                     }
                 }
@@ -718,12 +720,11 @@ function createIcon(iconClass, parentElement) {
 }
 function refreshToggleSortableBtn() {
     toggleSortableBtn.classList.toggle("enabled", isSortableEnabled);
-    toggleSortableBtn.dataset.enabled = isSortableEnabled ? "true" : "false";
-    toggleSortableBtn.textContent = isSortableEnabled ? "禁用排序" : "啟用排序";
+    //toggleSortableBtn.dataset.enabled = isSortableEnabled ? "true" : "false";
+    toggleSortableBtn.title = isSortableEnabled ? "禁用排序" : "啟用排序";
 }
 function toggleSortable() {
     isSortableEnabled = !isSortableEnabled;
-    refreshToggleSortableBtn();
     const sortableContainers = document.querySelectorAll(".task-tree");
     sortableContainers.forEach(container => {
         if (container.sortableInstance) {
@@ -734,6 +735,7 @@ function toggleSortable() {
     taskTitles.forEach(title => {
         title.style.cursor = isSortableEnabled ? "move" : "default";
     });
+    refreshToggleSortableBtn();
 }
 
 // ===========================
@@ -742,6 +744,13 @@ function toggleSortable() {
 function renderControls() {
     const controls = document.getElementById("controls");
     clearChildren(controls);
+
+    toggleSortableBtn = document.createElement("button");
+    refreshToggleSortableBtn();
+    toggleSortableBtn.type = "button";
+    createIcon("fa-arrows-up-down-left-right", toggleSortableBtn);
+    toggleSortableBtn.onclick = () => toggleSortable();
+    controls.appendChild(toggleSortableBtn);
 
     const undoBtn = document.createElement("button");
     undoBtn.title = "撤銷";
@@ -774,12 +783,6 @@ function renderControls() {
 
 function renderTreeRoot() {
     clearChildren(treeRoot);
-    toggleSortableBtn = document.createElement("button");
-    toggleSortableBtn.onclick = () => toggleSortable();
-    treeRoot.appendChild(toggleSortableBtn);
-    toggleSortableBtn.className = "indent full-width-btn";
-    toggleSortableBtn.type = "button";
-    refreshToggleSortableBtn();
     renderTree(rootTask.children, treeRoot);
     const rootAddBtn = document.createElement("button");
     rootAddBtn.className = "indent full-width-btn";
@@ -986,8 +989,7 @@ function createMemoLine(memo, index, colors) {
 
     const textSpan = document.createElement("span");
     textSpan.textContent = memo.text;
-    textSpan.className = "task-title";
-    textSpan.style.margin = "3px";
+    textSpan.className = "task-title memo";
 
     const editBtn = document.createElement("button");
     editBtn.className = "edit-btn";
@@ -1056,7 +1058,7 @@ function createListTitle(list) {
     titleRow.className = "task-line";
     const title = document.createElement("span");
     title.textContent = list.name;
-    title.className = "task-title";
+    title.className = "task-title memo";
     const btnBar = document.createElement("span");
     btnBar.className = "controls";
     const editBtn = document.createElement("button");

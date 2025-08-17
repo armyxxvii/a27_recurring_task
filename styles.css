@@ -10,10 +10,14 @@ body {
     padding: 0.5rem;
     font-family: sans-serif;
     background: #f5f5f5;
+    display: flex;
+    height: 100vh;
+    flex-direction: column;
+    align-items: stretch;
 }
 
     body.unsaved {
-        background: #fff288  !important;
+        background: #fff288 !important;
     }
 
 button i {
@@ -42,6 +46,15 @@ button i {
         .container button:hover {
             background: #666;
         }
+
+        .container button.enabled {
+            background: #a00;
+        }
+
+            .container button.enabled:hover {
+                background: #f44336;
+                color: white;
+            }
 
 .indent {
     margin-left: 0.5rem;
@@ -81,10 +94,10 @@ h6 {
 }
 
 .title-bar {
+    z-index: 10000;
     display: flex;
-    justify-content: space-between;
     flex-wrap: wrap;
-    margin-bottom: 0.5rem;
+    justify-content: space-between;
 }
 
     .title-bar button {
@@ -100,6 +113,10 @@ h6 {
     .title-bar small {
         font-size: 0.8rem;
     }
+
+.content-area {
+    overflow-y: scroll;
+}
 
 #controls {
     display: flex;
@@ -123,15 +140,6 @@ h6 {
     margin-bottom: 1px;
 }
 
-    .full-width-btn.enabled {
-        background: #a00;
-    }
-
-        .full-width-btn.enabled:hover {
-            background: #f44336;
-            color: white;
-        }
-
 /* ===========================
    共用捲軸區域
 =========================== */
@@ -147,7 +155,7 @@ h6 {
     flex-shrink: 0;
     width: 50%;
     max-width: 220px;
-    padding: 2px 0 0 0;
+    padding: 25px 0 0 0;
     border: none;
 }
 
@@ -196,11 +204,15 @@ ul.task-tree {
 .task-title {
     font-size: 0.8rem;
     flex: 1;
-    cursor: default;
-    white-space: pre-wrap;
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+    .task-title.memo {
+        white-space: pre-wrap;
+        margin: 3px;
+    }
 
 /* ===========================
    編輯視窗

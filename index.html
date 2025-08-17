@@ -14,35 +14,37 @@
         <h1>任務樹 × 循環行事曆<sub>v5818.1</sub></h1>
         <div id="controls" class="container"></div>
     </header>
-    <div class="container">
-        <label class="task-title" for="calendar-start">範圍</label>
-        <input type="date" id="calendar-start" title="選擇開始日期">
-        <label class="task-title" for="calendar-end">~</label>
-        <input type="date" id="calendar-end" title="選擇結束日期">
-        <button type="button" id="apply-range-btn">套用</button>
-    </div>
-    <div class="container scroll-sync">
-        <!-- 左欄：任務樹 -->
-        <div id="task-tree-root" class="outdent tree-column"></div>
+    <div class="content-area">
+        <div class="container">
+            <label class="task-title" for="calendar-start">範圍</label>
+            <input type="date" id="calendar-start" title="選擇開始日期">
+            <label class="task-title" for="calendar-end">~</label>
+            <input type="date" id="calendar-end" title="選擇結束日期">
+            <button type="button" id="apply-range-btn">套用</button>
+        </div>
+        <div class="container scroll-sync">
+            <!-- 左欄：任務樹 -->
+            <div id="task-tree-root" class="outdent tree-column"></div>
 
-        <!-- 右欄：行事曆格子 -->
-        <div id="calendar-column" class="calendar-column" data-scrollable>
-            <table id="calendar-table">
-                <thead><tr id="date-header"></tr></thead>
-                <tbody id="calendar-body"></tbody>
-            </table>
+            <!-- 右欄：行事曆格子 -->
+            <div id="calendar-column" class="calendar-column" data-scrollable>
+                <table id="calendar-table">
+                    <thead><tr id="date-header"></tr></thead>
+                    <tbody id="calendar-body"></tbody>
+                </table>
+            </div>
         </div>
-    </div>
-    <!-- 清單 -->
-    <div class="container">
-        <div id="list-root" class="outdent">
-            <ul id="list-container" class="task-tree"></ul>
+        <!-- 清單 -->
+        <div class="container">
+            <div id="list-root" class="outdent">
+                <ul id="list-container" class="task-tree"></ul>
+            </div>
         </div>
-    </div>
-    <!-- 備忘 -->
-    <div class="container">
-        <div id="memo-root" class="outdent">
-            <ul id="memo-list" class="task-tree"></ul>
+        <!-- 備忘 -->
+        <div class="container">
+            <div id="memo-root" class="outdent">
+                <ul id="memo-list" class="task-tree"></ul>
+            </div>
         </div>
     </div>
 
