@@ -1,12 +1,10 @@
 ﻿// ===========================
 // 1. DOM nodes & global state
 // ===========================
-const treeRoot = document.getElementById("task-tree-root");
-const dateHead = document.getElementById("date-header");
 const calendarStart = document.getElementById("calendar-start");
 const calendarEnd = document.getElementById("calendar-end");
-const calendarBody = document.getElementById("calendar-body");
 const toast = document.getElementById("save-toast");
+const taskRoot = document.getElementById("task-root");
 const listRoot = document.getElementById("list-root");
 const listContainer = document.getElementById("list-container");
 const memoRoot = document.getElementById("memo-root");
@@ -102,6 +100,12 @@ async function saveAllToGoogleSheet() {
     } finally {
         hidePageDim();
     }
+}
+function saveUserToLocalStorage(user) {
+    localStorage.setItem("lastUser", user);
+}
+function getUserFromLocalStorage() {
+    return localStorage.getItem("lastUser");
 }
 function getPayload() {
     return {
@@ -614,6 +618,9 @@ function showLogin() {
         renderControls();
         return;
     }
+
+    const lastUser = getUserFromLocalStorage();
+
     // 欄位
     const label = document.createElement("label");
     label.textContent = "暱稱（帳號）：";
@@ -621,6 +628,7 @@ function showLogin() {
     input.type = "text";
     input.id = "login-user";
     input.autofocus = true;
+    if (lastUser) input.value = lastUser;
     label.appendChild(input);
 
     openEditor({
@@ -636,8 +644,8 @@ function showLogin() {
                         showToast("請輸入暱稱");
                         return;
                     }
-                    // 註冊/登入
                     editor.style.display = "none";
+                    // 註冊/登入
                     const res = await fetch(url + `?action=register&user=${encodeURIComponent(user)}`, {
                         method: "GET",
                         headers: { "Content-Type": "text/plain;charset=utf-8" }
@@ -645,10 +653,11 @@ function showLogin() {
                     const data = await res.json();
                     if (data.success) {
                         currentUser = user;
+                        saveUserToLocalStorage(user);
                         showToast("登入成功：" + user);
                         editor.remove();
+                        await fetchAllFromGoogleSheet();
                         renderControls();
-                        fetchAllFromGoogleSheet();
                     } else {
                         editor.style.display = "block";
                         showToast("登入失敗，請重試");
@@ -695,8 +704,7 @@ function refreshAll() {
     });
     today = parseDate(new Date());
     buildIdMap(rootTask.children);
-    renderTreeRoot();
-    renderCalendar();
+    renderTasks();
     renderMemos();
     renderLists();
     document.querySelectorAll("[data-scrollable]").forEach(el => {
@@ -781,18 +789,54 @@ function renderControls() {
     controls.appendChild(saveBtn);
 }
 
-function renderTreeRoot() {
-    clearChildren(treeRoot);
+function renderTasks() {
+    clearChildren(taskRoot);
+
+    const headerRow = document.createElement("tr");
+    headerRow.id = "date-header";
+
+    const thead = document.createElement("thead");
+    thead.appendChild(headerRow);
+    thead.addEventListener("click", toggleHoliday);
+
+    const tbody = document.createElement("tbody");
+    tbody.id = "calendar-body";
+
+    const calendarTable = document.createElement("table");
+    calendarTable.id = "calendar-table";
+    calendarTable.appendChild(thead);
+    calendarTable.appendChild(tbody);
+    renderCalendar(thead, tbody);
+    calendarTable.addEventListener("click", toggleComplete);
+
+    const calendarColumn = document.createElement("div");
+    calendarColumn.id = "calendar-column";
+    calendarColumn.className = "calendar-column";
+    calendarColumn.setAttribute("data-scrollable", "");
+    calendarColumn.appendChild(calendarTable);
+
+    const treeRoot = document.createElement("div");
+    treeRoot.id = "task-tree-root";
+    treeRoot.className = "outdent tree-column";
+    treeRoot.addEventListener("click", toggleTaskCollapse);
     renderTree(rootTask.children, treeRoot);
-    const rootAddBtn = document.createElement("button");
-    rootAddBtn.className = "indent full-width-btn";
-    rootAddBtn.textContent = "➕ 新增任務";
-    rootAddBtn.type = "button";
-    rootAddBtn.onpointerdown = () => {
+
+    const scrollSyncDiv = document.createElement("div");
+    scrollSyncDiv.className = "scroll-sync";
+    scrollSyncDiv.appendChild(treeRoot);
+    scrollSyncDiv.appendChild(calendarColumn);
+
+    const addTaskBtn = document.createElement("button");
+    addTaskBtn.className = "full-width-btn";
+    addTaskBtn.textContent = "➕ 新增任務";
+    addTaskBtn.type = "button";
+    addTaskBtn.onclock = () => {
         const t = newTask();
         openTaskEditor(t, rootTask.children, true);
     };
-    treeRoot.appendChild(rootAddBtn);
+
+    taskRoot.appendChild(scrollSyncDiv);
+    taskRoot.appendChild(addTaskBtn);
 }
 function renderTree(data, parentEl, path = [0]) {
     const ul = document.createElement("ul");
@@ -892,9 +936,7 @@ function createTaskNode(task, path) {
     return node;
 }
 
-function renderCalendar() {
-    clearChildren(dateHead);
-    clearChildren(calendarBody);
+function renderCalendar(thead, tbody) {
     const dates = generateDates();
     const dsArr = dates.map(formatDate);
     const todayStr = formatDate(today);
@@ -908,13 +950,13 @@ function renderCalendar() {
         if (ds === todayStr) th.classList.add("today");
         headFrag.appendChild(th);
     });
-    dateHead.appendChild(headFrag);
+    thead.appendChild(headFrag);
     const bodyFrag = document.createDocumentFragment();
     flattenTasks(rootTask.children).forEach(task => {
         const tr = createCalendarRow(task, dsArr, todayStr, colors);
         bodyFrag.appendChild(tr);
     });
-    calendarBody.appendChild(bodyFrag);
+    tbody.appendChild(bodyFrag);
 }
 function createCalendarRow(task, dsArr, todayStr, colors) {
     const tr = document.createElement("tr");
@@ -950,11 +992,10 @@ function createCalendarRow(task, dsArr, todayStr, colors) {
 }
 
 function renderMemos() {
-    clearChildren(memoList);
     clearChildren(memoRoot);
     const ul = document.createElement("ul");
     ul.id = "memo-list";
-    ul.className = "task-tree";
+    ul.className = "outdent task-tree";
     memos.forEach((memo, index) => {
         const li = createMemoLine(memo, index, colors);
         ul.appendChild(li);
@@ -971,7 +1012,7 @@ function renderMemos() {
         }
     });
     const addBtn = document.createElement("button");
-    addBtn.className = "indent full-width-btn";
+    addBtn.className = "full-width-btn";
     addBtn.type = "button";
     addBtn.textContent = "➕ 新增備忘";
     addBtn.onclick = () => openMemoEditor(newMemo(), memos.length, true);
@@ -1010,11 +1051,10 @@ function createMemoLine(memo, index, colors) {
 }
 
 function renderLists() {
-    clearChildren(listContainer);
     clearChildren(listRoot);
     const ul = document.createElement("ul");
     ul.id = "list-container";
-    ul.className = "task-tree";
+    ul.className = "outdent task-tree";
     lists.forEach((list, index) => {
         const li = createListLine(list, index, colors);
         ul.appendChild(li);
@@ -1031,7 +1071,7 @@ function renderLists() {
         }
     });
     const addBtn = document.createElement("button");
-    addBtn.className = "indent full-width-btn";
+    addBtn.className = "full-width-btn";
     addBtn.type = "button";
     addBtn.textContent = "➕ 新增清單";
     addBtn.onclick = () => openListEditor(newList(), true);
@@ -1108,7 +1148,4 @@ function createListTable(list) {
 // 5. Event delegation
 // ===========================
 document.addEventListener("DOMContentLoaded", showLogin);
-dateHead.addEventListener("click", toggleHoliday);
-treeRoot.addEventListener("click", toggleTaskCollapse);
 document.getElementById("apply-range-btn").addEventListener("click", updateDateRange);
-document.getElementById("calendar-table").addEventListener("click", toggleComplete);
