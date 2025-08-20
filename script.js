@@ -10,7 +10,7 @@ const listContainer = document.getElementById("list-container");
 const memoRoot = document.getElementById("memo-root");
 const memoList = document.getElementById("memo-list");
 
-const url = "https://script.google.com/macros/s/AKfycbxPcggbgGkQuWVebjOq53HifOJfInpgSDiYnpMfE6oxY_M8PAlBUeclKwnDW5BuxbAO/exec"
+const url = "https://script.google.com/macros/s/AKfycbzLYRGca3GVMa6HcCiWBZ_ONe_Lpcq-JHUjA6-SLsMTLCDp8StUFZVPTTMjouR1cO40/exec"
 
 const undoStack = [];
 const redoStack = [];
