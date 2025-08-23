@@ -10,7 +10,7 @@ const listContainer = document.getElementById("list-container");
 const memoRoot = document.getElementById("memo-root");
 const memoList = document.getElementById("memo-list");
 
-const url = "https://script.google.com/macros/s/AKfycbzLYRGca3GVMa6HcCiWBZ_ONe_Lpcq-JHUjA6-SLsMTLCDp8StUFZVPTTMjouR1cO40/exec"
+const url = "https://script.google.com/macros/s/AKfycbyh1bOMMMIYLZF1o4A_q1UZpRzcqYKi_9ewciRbqp06MIZfgcTqJ-3pWA6utSQWWU_8/exec";
 
 const undoStack = [];
 const redoStack = [];
@@ -31,6 +31,10 @@ const colors = [
     "#dad",     // 藕色／溫和
     "#fb5",     // 橘茶／溫和
 ];
+const KEYS = {
+    LAST_USER: "lastUser",
+    LAST_MONTH: "lastMonth"
+};
 const idMap = new Map();
 const rootTask = {
     title: "ROOT",
@@ -48,16 +52,20 @@ let toggleSortableBtn;
 let isSortableEnabled = false;
 
 let currentUser = null;
+let currentMonth = null;
 
 // ===========================
 // 2a. Google Sheets I/O
 // ===========================
 // 讀取所有資料
-async function fetchAllFromGoogleSheet() {
-    if (!currentUser) return showLogin();
+async function fetchDataFromGoogleSheet() {
+    if (!currentUser || !currentMonth) {
+        showToast("請先登入並選擇月份");
+        return showLogin();
+    }
     showPageDim();
     try {
-        const res = await fetch(url + `?user=${encodeURIComponent(currentUser)}`, {
+        const res = await fetch(url + `?action=getUserData&user=${encodeURIComponent(currentUser)}&month=${encodeURIComponent(currentMonth)}`, {
             method: "GET",
             headers: { "Content-Type": "text/plain;charset=utf-8" }
         });
@@ -76,13 +84,19 @@ async function fetchAllFromGoogleSheet() {
         refreshAll();
         document.body.classList.remove("unsaved");
         showToast("已從 Google Sheets 讀取");
+    } catch (error) {
+        console.error("讀取資料失敗：", error);
+        showToast("讀取資料失敗");
     } finally {
         hidePageDim();
     }
 }
 // 儲存所有資料
-async function saveAllToGoogleSheet() {
-    if (!currentUser) return showLogin();
+async function saveDataToGoogleSheet() {
+    if (!currentUser || !currentMonth) {
+        showToast("請先登入並選擇月份");
+        return showLogin();
+    }
     showPageDim();
     try {
         lists.forEach(list => {
@@ -90,26 +104,29 @@ async function saveAllToGoogleSheet() {
         });
         sortDates();
         refreshAll();
-        await fetch(url + `?user=${encodeURIComponent(currentUser)}`, {
+        const data = JSON.stringify(getPayload());
+        await fetch(url + `?action=saveUserData&user=${encodeURIComponent(currentUser)}&month=${encodeURIComponent(currentMonth)}`, {
             method: "POST",
-            body: JSON.stringify(getPayload()),
+            body: data,
             headers: { "Content-Type": "text/plain;charset=utf-8" }
         });
         document.body.classList.remove("unsaved");
         showToast("已儲存到 Google Sheets");
+    } catch (error) {
+        console.error("儲存資料失敗：", error);
+        showToast("儲存資料失敗");
     } finally {
         hidePageDim();
     }
 }
-function saveUserToLocalStorage(user) {
-    localStorage.setItem("lastUser", user);
+function localSave(key, value) {
+    localStorage.setItem(key, value);
 }
-function getUserFromLocalStorage() {
-    return localStorage.getItem("lastUser");
+function localLoad(key) { 
+    return localStorage.getItem(key);
 }
 function getPayload() {
-    return {
-        user: currentUser,
+    const payload = {
         holidays: Array.from(holidayDates),
         calendarRange: {
             start: calendarStartDate ? formatDate(calendarStartDate) : null,
@@ -118,6 +135,12 @@ function getPayload() {
         tasks: rootTask.children,
         memos,
         lists
+    };
+    const json = JSON.stringify(payload);
+    return {
+        user: currentUser,
+        month: currentMonth,
+        data: json
     };
 }
 
@@ -613,13 +636,13 @@ function createListFields(list) {
 }
 
 
-function showLogin() {
+async function showLogin() {
     if (currentUser) {
         renderControls();
         return;
     }
 
-    const lastUser = getUserFromLocalStorage();
+    const lastUser = localLoad(KEYS.LAST_USER);
 
     // 欄位
     const label = document.createElement("label");
@@ -646,17 +669,18 @@ function showLogin() {
                     }
                     editor.style.display = "none";
                     // 註冊/登入
-                    const res = await fetch(url + `?action=register&user=${encodeURIComponent(user)}`, {
+                    const res = await fetch(url + `?action=login&user=${encodeURIComponent(user)}`, {
                         method: "GET",
                         headers: { "Content-Type": "text/plain;charset=utf-8" }
                     });
                     const data = await res.json();
                     if (data.success) {
                         currentUser = user;
-                        saveUserToLocalStorage(user);
+                        localSave(KEYS.LAST_USER, user);
                         showToast("登入成功：" + user);
                         editor.remove();
-                        await fetchAllFromGoogleSheet();
+
+                        await showMonthSelection(data);
                         renderControls();
                     } else {
                         editor.style.display = "block";
@@ -676,6 +700,50 @@ function showLogin() {
         }
     });
 }
+
+async function showMonthSelection(data) {
+    if (!data.months || data.months.length === 0) {
+        showToast("無可用的任務月份");
+        return;
+    }
+
+    const label = document.createElement("label");
+    label.textContent = "選擇月份：";
+    const select = document.createElement("select");
+    select.id = "month-select";
+    select.value = localLoad(KEYS.LAST_MONTH) || data.months[0];
+    data.months.forEach(month => {
+        const option = document.createElement("option");
+        option.value = month;
+        option.textContent = month;
+        select.appendChild(option);
+    });
+    label.appendChild(select);
+
+    openEditor({
+        title: "選擇任務月份",
+        fields: [label],
+        isNew: true,
+        buttons: [
+            {
+                text: "確定",
+                onClick: async (editor) => {
+                    const selectedMonth = select.value;
+                    if (!selectedMonth) {
+                        showToast("請選擇月份");
+                        return;
+                    }
+
+                    localSave(KEYS.LAST_MONTH, selectedMonth);
+                    currentMonth = selectedMonth;
+                    editor.remove();
+                    await fetchDataFromGoogleSheet();
+                }
+            }
+        ]
+    });
+}
+
 function showToast(msg = "已儲存") {
     toast.textContent = msg;
     toast.classList.add("show");
@@ -778,14 +846,14 @@ function renderControls() {
     openBtn.title = "從 Google Sheets 讀取資料";
     openBtn.type = "button";
     createIcon("fa-cloud-arrow-down", openBtn);
-    openBtn.onclick = fetchAllFromGoogleSheet;
+    openBtn.onclick = fetchDataFromGoogleSheet;
     controls.appendChild(openBtn);
 
     const saveBtn = document.createElement("button");
     saveBtn.title = "儲存到 Google Sheets";
     saveBtn.type = "button";
     createIcon("fa-cloud-arrow-up", saveBtn);
-    saveBtn.onclick = saveAllToGoogleSheet;
+    saveBtn.onclick = saveDataToGoogleSheet;
     controls.appendChild(saveBtn);
 }
 
@@ -1147,5 +1215,5 @@ function createListTable(list) {
 // ===========================
 // 5. Event delegation
 // ===========================
-document.addEventListener("DOMContentLoaded", showLogin);
 document.getElementById("apply-range-btn").addEventListener("click", updateDateRange);
+document.addEventListener("DOMContentLoaded", showLogin);
