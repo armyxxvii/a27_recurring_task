@@ -798,13 +798,13 @@ async function showMonthSelection(data) {
     label.textContent = "選擇月份：";
     const select = document.createElement("select");
     select.id = "month-select";
-    select.value = localLoad(KEYS.LAST_MONTH) || data.months[0];
     data.months.forEach(month => {
         const option = document.createElement("option");
         option.value = month;
         option.textContent = month;
         select.appendChild(option);
     });
+    select.value = localLoad(KEYS.LAST_MONTH) || data.months[0];
     label.appendChild(select);
 
     openEditor({
@@ -993,10 +993,7 @@ function renderTasks() {
     addTaskBtn.className = "full-width-btn";
     addTaskBtn.textContent = "➕ 新增任務";
     addTaskBtn.type = "button";
-    addTaskBtn.onclock = () => {
-        const t = newTask();
-        openTaskEditor(t, rootTask.children, true);
-    };
+    addTaskBtn.addEventListener("click", () => openTaskEditor(newTask(), rootTask.children, true));
 
     taskRoot.appendChild(scrollSyncDiv);
     taskRoot.appendChild(addTaskBtn);
@@ -1310,5 +1307,6 @@ function createListTable(list) {
 // ===========================
 // 5. Event delegation
 // ===========================
-document.getElementById("apply-range-btn").addEventListener("click", updateDateRange);
+document.getElementById("calendar-start").addEventListener("change", updateDateRange);
+document.getElementById("calendar-end").addEventListener("change", updateDateRange);
 document.addEventListener("DOMContentLoaded", showLogin);
