@@ -1,6 +1,8 @@
 ﻿// ===========================
 // 1. DOM nodes & global state
 // ===========================
+const titleUser = document.getElementById("title-user");
+const titleMonth = document.getElementById("title-month");
 const calendarStart = document.getElementById("calendar-start");
 const calendarEnd = document.getElementById("calendar-end");
 const toast = document.getElementById("save-toast");
@@ -83,6 +85,8 @@ async function fetchDataFromGoogleSheet() {
         }
         refreshAll();
         document.body.classList.remove("unsaved");
+        titleUser.innerText = currentUser;
+        titleMonth.innerText = currentMonth;
         showToast("已從 Google Sheets 讀取");
     } catch (error) {
         console.error("讀取資料失敗：", error);
@@ -97,24 +101,43 @@ async function saveDataToGoogleSheet() {
         showToast("請先登入並選擇月份");
         return showLogin();
     }
+
+    lists.forEach(list => {
+        if (!list.id) list.id = generateUniqueId();
+    });
+    const data = getCurrentData();
+    await uploadDataToGoogleSheet(currentUser, currentMonth, data);
+}
+async function uploadDataToGoogleSheet(user, month, data) {
+    if (!user || !month) {
+        showToast("請先登入並選擇月份");
+        return showLogin();
+    }
+
     showPageDim();
+    const payload = {
+        user: user,
+        month: month,
+        data: JSON.stringify(data)
+    };
+
     try {
-        lists.forEach(list => {
-            if (!list.id) list.id = generateUniqueId();
-        });
-        sortDates();
-        refreshAll();
-        const data = JSON.stringify(getPayload());
-        await fetch(url + `?action=saveUserData&user=${encodeURIComponent(currentUser)}&month=${encodeURIComponent(currentMonth)}`, {
+        const res = await fetch(url + `?action=upload`, {
             method: "POST",
-            body: data,
+            body: JSON.stringify(payload),
             headers: { "Content-Type": "text/plain;charset=utf-8" }
         });
-        document.body.classList.remove("unsaved");
-        showToast("已儲存到 Google Sheets");
+
+        if (res.ok) {
+            document.body.classList.remove("unsaved");
+            showToast("已成功上傳資料");
+        } else {
+            showToast("上傳失敗，請稍後再試");
+            console.error(res.message);
+        }
     } catch (error) {
-        console.error("儲存資料失敗：", error);
-        showToast("儲存資料失敗");
+        console.error("上傳失敗：", error);
+        showToast("上傳失敗，請檢查網路連線");
     } finally {
         hidePageDim();
     }
@@ -125,8 +148,10 @@ function localSave(key, value) {
 function localLoad(key) { 
     return localStorage.getItem(key);
 }
-function getPayload() {
-    const payload = {
+function getCurrentData() {
+    sortDates();
+    refreshAll();
+    return {
         holidays: Array.from(holidayDates),
         calendarRange: {
             start: calendarStartDate ? formatDate(calendarStartDate) : null,
@@ -136,16 +161,78 @@ function getPayload() {
         memos,
         lists
     };
-    const json = JSON.stringify(payload);
+}
+
+// ===========================
+// 2b. 產生下一個月資料
+// ===========================
+async function saveNextMonthData() {
+    if (!currentUser || !currentMonth) {
+        showToast("請先登入並選擇目前月份");
+        return showLogin();
+    }
+    const nextMonth = getNextKey();
+    const data = getNextData();
+    await uploadDataToGoogleSheet(currentUser, nextMonth, data);
+
+    // 重新登入並選擇新月份
+    currentMonth = nextMonth;
+    await fetchDataFromGoogleSheet();
+}
+function getNextData() {
+    sortDates();
+    refreshAll();
+
+    const nextMonthRange = generateNextMonthRange(today);
+    const clonedTasks = JSON.parse(JSON.stringify(rootTask.children));
+    const cleanedTasks = cleanTasks(clonedTasks);
+
     return {
-        user: currentUser,
-        month: currentMonth,
-        data: json
+        holidays: [],
+        calendarRange: nextMonthRange,
+        tasks: cleanedTasks,
+        memos: JSON.parse(JSON.stringify(memos)),
+        lists: JSON.parse(JSON.stringify(lists))
+    };
+}
+function cleanTasks(tasks) {
+    tasks.forEach(task => {
+        if (Array.isArray(task.completionDates) && task.completionDates.length > 0) {
+            task.completionDates = [task.completionDates[0]]; // 僅保留最新日期
+        }
+        if (Array.isArray(task.children)) {
+            cleanTasks(task.children); // 遞迴清理子任務
+        }
+    });
+    return tasks;
+}
+function getNextKey() {
+    const year = parseInt(currentMonth.slice(1, 3), 10); // 提取年份
+    const month = parseInt(currentMonth.slice(4, 6), 10); // 提取月份
+
+    let nextYear = year;
+    let nextMonth = month + 1;
+
+    if (nextMonth > 12) {
+        nextMonth = 1;
+        nextYear += 1;
+    }
+
+    // 返回格式化的 "yYYmMM"
+    return `y${String(nextYear).padStart(2, "0")}m${String(nextMonth).padStart(2, "0")}`;
+}
+function generateNextMonthRange(today) {
+    const nextMonthStart = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    const nextMonthEnd = new Date(nextMonthStart.getFullYear(), nextMonthStart.getMonth() + 1, 0);
+
+    return {
+        start: formatDate(nextMonthStart),
+        end: formatDate(nextMonthEnd)
     };
 }
 
 // ===========================
-// 2b. 撤銷 / 重做
+// 2c. 撤銷 / 重做
 // ===========================
 function getCurrentState() {
     return {
@@ -855,6 +942,14 @@ function renderControls() {
     createIcon("fa-cloud-arrow-up", saveBtn);
     saveBtn.onclick = saveDataToGoogleSheet;
     controls.appendChild(saveBtn);
+
+    // 新增「產生下一個月」按鈕
+    const nextMonthBtn = document.createElement("button");
+    nextMonthBtn.title = "產生下個月";
+    nextMonthBtn.type = "button";
+    createIcon("fa-calendar-plus", nextMonthBtn);
+    nextMonthBtn.onclick = saveNextMonthData;
+    controls.appendChild(nextMonthBtn);
 }
 
 function renderTasks() {
