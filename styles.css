@@ -330,8 +330,8 @@ table {
     }
 
     table .done-future {
-        background: #9f88;
-        color: #0008;
+        background: #9f88 !important;
+        color: #0008 !important;
         font-size: 0.8rem;
     }
 
@@ -341,8 +341,8 @@ table {
     }
 
     table .overdue {
-        background: #0008;
-        color: #f88;
+        background: #0008 !important;
+        color: #f88 !important;
     }
 
     table .normal {
