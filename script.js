@@ -19,6 +19,9 @@ const redoStack = [];
 const holidayDates = new Set();
 const farFuture = "2700-02-27";
 const dayMs = 1000 * 60 * 60 * 24;
+const today = parseDate(new Date());
+const todayStr = formatDate(today);
+
 const colors = [
     "",         // 無底色
     "#ddf",     // 靛紫／輕柔
@@ -47,11 +50,11 @@ const rootTask = {
 let tasks = [];
 let lists = [];
 let memos = [];
-let today;
 let calendarStartDate = null;
 let calendarEndDate = null;
 let toggleSortableBtn;
 let isSortableEnabled = false;
+let showTodayTasksOnly = false;
 
 let currentUser = null;
 let currentMonth = null;
@@ -857,7 +860,6 @@ function refreshAll() {
     document.querySelectorAll("[data-scrollable]").forEach(el => {
         scrollPositions.set(el.id, el.scrollLeft);
     });
-    today = parseDate(new Date());
     buildIdMap(rootTask.children);
     renderTasks();
     renderMemos();
@@ -900,6 +902,23 @@ function toggleSortable() {
     });
     refreshToggleSortableBtn();
 }
+function getShowTasks() {
+    let tasksToShow = rootTask.children;
+    if (showTodayTasksOnly) {
+        const isScheduledToday = task => (task.completionDates || []).some(date => formatDate(parseDate(date)) === todayStr);
+        tasksToShow = flattenTasks(tasksToShow).filter(isScheduledToday);
+    }
+    return tasksToShow;
+}
+function refreshShowTodayTasksBtn() {
+    showTodayTasksBtn.classList.toggle("enabled", showTodayTasksOnly);
+    showTodayTasksBtn.title = showTodayTasksOnly ? "顯示全部任務" : "只顯示今日有排程的任務";
+}
+function toggleShowTodayTasksOnly() {
+    showTodayTasksOnly = !showTodayTasksOnly;
+    refreshShowTodayTasksBtn();
+    refreshAll();
+}
 
 // ===========================
 // 4b. Render
@@ -912,8 +931,15 @@ function renderControls() {
     refreshToggleSortableBtn();
     toggleSortableBtn.type = "button";
     createIcon("fa-arrows-up-down-left-right", toggleSortableBtn);
-    toggleSortableBtn.onclick = () => toggleSortable();
+    toggleSortableBtn.onclick = toggleSortable;
     controls.appendChild(toggleSortableBtn);
+
+    showTodayTasksBtn = document.createElement("button");
+    refreshShowTodayTasksBtn();
+    showTodayTasksBtn.type = "button";
+    createIcon("fa-calendar-day", showTodayTasksBtn);
+    showTodayTasksBtn.onclick = toggleShowTodayTasksOnly;
+    controls.appendChild(showTodayTasksBtn);
 
     const undoBtn = document.createElement("button");
     undoBtn.title = "撤銷";
@@ -982,7 +1008,7 @@ function renderTasks() {
     treeRoot.id = "task-tree-root";
     treeRoot.className = "outdent tree-column";
     treeRoot.addEventListener("click", toggleTaskCollapse);
-    renderTree(rootTask.children, treeRoot);
+    renderTree(getShowTasks(), treeRoot);
 
     const scrollSyncDiv = document.createElement("div");
     scrollSyncDiv.className = "scroll-sync";
@@ -1099,7 +1125,6 @@ function createTaskNode(task, path) {
 function renderCalendar(thead, tbody) {
     const dates = generateDates();
     const dsArr = dates.map(formatDate);
-    const todayStr = formatDate(today);
     const headFrag = document.createDocumentFragment();
     dsArr.forEach(ds => {
         const th = document.createElement("th");
@@ -1111,8 +1136,17 @@ function renderCalendar(thead, tbody) {
         headFrag.appendChild(th);
     });
     thead.appendChild(headFrag);
+
+    let tasksToShow;
+    if (showTodayTasksOnly) {
+        tasksToShow = getShowTasks();
+    }
+    else {
+        tasksToShow = flattenTasks(rootTask.children);
+    }
+
     const bodyFrag = document.createDocumentFragment();
-    flattenTasks(rootTask.children).forEach(task => {
+    tasksToShow.forEach(task => {
         const tr = createCalendarRow(task, dsArr, todayStr, colors);
         bodyFrag.appendChild(tr);
     });
@@ -1307,6 +1341,6 @@ function createListTable(list) {
 // ===========================
 // 5. Event delegation
 // ===========================
-document.getElementById("calendar-start").addEventListener("change", updateDateRange);
-document.getElementById("calendar-end").addEventListener("change", updateDateRange);
+calendarStart.addEventListener("change", updateDateRange);
+calendarEnd.addEventListener("change", updateDateRange);
 document.addEventListener("DOMContentLoaded", showLogin);
