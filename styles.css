@@ -103,21 +103,14 @@ h6 {
 }
 
     .title-bar button {
-        height: 2rem;
-        width: 2rem;
-        font-size: 1.2rem;
-        line-height: 1.2rem;
+        height: 1.7rem;
+        width: 1.7rem;
+        flex-grow: 1;
         padding: 0;
     }
     .title-bar .task-info {
         font-size: 0.7rem;
-        border-radius: 6px;
-        padding: 0px 6px;
         background: gold;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: space-evenly;
     }
 
     .title-bar sub,
@@ -132,15 +125,11 @@ h6 {
 
 #controls {
     display: flex;
-    gap: 0.7rem;
+    flex-grow: 1;
+    gap: 0.3rem;
     flex-wrap: nowrap;
+    justify-content: space-evenly;
 }
-
-    #controls button {
-        width: 3rem;
-        height: 1.5rem;
-        font-size: 1.2rem;
-    }
 
 /* ===========================
    全寬度按鈕
@@ -349,6 +338,9 @@ table {
         background: #8880;
     }
 
+#list-root td {
+    min-width: 1.8rem;
+}
 /* ===========================
    通用通知樣式
 =========================== */
