@@ -331,6 +331,11 @@ function diffDays(task, prevCompDate, targetDate) {
 }
 function generateDates() {
     const result = [];
+    if (showTodayTasksOnly) {
+        result.push(today);
+        return result;
+    }
+
     const start = calendarStartDate || today;
     const end = calendarEndDate || new Date(start.getTime() + 14 * 86400000);
     let cursor = new Date(start);
@@ -1147,12 +1152,12 @@ function renderCalendar(thead, tbody) {
 
     const bodyFrag = document.createDocumentFragment();
     tasksToShow.forEach(task => {
-        const tr = createCalendarRow(task, dsArr, todayStr, colors);
+        const tr = createCalendarRow(task, dsArr, colors);
         bodyFrag.appendChild(tr);
     });
     tbody.appendChild(bodyFrag);
 }
-function createCalendarRow(task, dsArr, todayStr, colors) {
+function createCalendarRow(task, dsArr, colors) {
     const tr = document.createElement("tr");
     tr.style.background = colors[task.swatchId] || "transparent";
     const compDates = (task.completionDates || []).map(parseDate);

@@ -111,6 +111,10 @@ h6 {
     .title-bar .task-info {
         font-size: 0.7rem;
         background: gold;
+        padding: 0.2rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
     }
 
     .title-bar sub,
