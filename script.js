@@ -1003,22 +1003,26 @@ function renderTasks() {
     renderCalendar(thead, tbody);
     calendarTable.addEventListener("click", toggleComplete);
 
-    const calendarColumn = document.createElement("div");
-    calendarColumn.id = "calendar-column";
-    calendarColumn.className = "calendar-column";
-    calendarColumn.setAttribute("data-scrollable", "");
-    calendarColumn.appendChild(calendarTable);
-
     const treeRoot = document.createElement("div");
     treeRoot.id = "task-tree-root";
-    treeRoot.className = "outdent tree-column";
+    treeRoot.className = "outdent";
     treeRoot.addEventListener("click", toggleTaskCollapse);
     renderTree(getShowTasks(), treeRoot);
 
     const scrollSyncDiv = document.createElement("div");
-    scrollSyncDiv.className = "scroll-sync";
     scrollSyncDiv.appendChild(treeRoot);
-    scrollSyncDiv.appendChild(calendarColumn);
+
+    if (!showTodayTasksOnly) {
+        treeRoot.className = "outdent tree-column";
+        scrollSyncDiv.className = "scroll-sync";
+
+        const calendarColumn = document.createElement("div");
+        calendarColumn.id = "calendar-column";
+        calendarColumn.className = "calendar-column";
+        calendarColumn.setAttribute("data-scrollable", "");
+        calendarColumn.appendChild(calendarTable);
+        scrollSyncDiv.appendChild(calendarColumn);
+    }
 
     const addTaskBtn = document.createElement("button");
     addTaskBtn.className = "full-width-btn";
@@ -1036,8 +1040,9 @@ function renderTree(data, parentEl, path = [0]) {
     data.forEach((task, i) => {
         const nodePath = [...path, i];
         const li = createTaskNode(task, nodePath);
+        const needRenderChildren = !task.collapsed && !showTodayTasksOnly;
 
-        if (task.children?.length && !task.collapsed) {
+        if (task.children?.length > 0 && needRenderChildren) {
             renderTree(task.children, li, nodePath);
         }
         ul.appendChild(li);
