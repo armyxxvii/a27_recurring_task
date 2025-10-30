@@ -420,7 +420,7 @@ function flattenTasks(data, parentPath = [], visible = true) {
     data.forEach(task => {
         const path = [...parentPath, task.title];
         if (visible) list.push({ ...task, fullTitle: path.join(" / ") });
-        const showChildren = !task.collapsed;
+        const showChildren = !task.collapsed || showTodayTasksOnly;
         if (showChildren && task.children?.length) {
             list.push(...flattenTasks(task.children, path, showChildren));
         }
