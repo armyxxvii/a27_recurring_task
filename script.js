@@ -378,6 +378,27 @@ function deleteTask(task) {
     }
     return false;
 }
+function copyTask(task) {
+    const path = findTaskPath(task);
+    if (!path) return false;
+    const { parent } = getTaskByPath(path);
+    function deepCopy(obj) {
+        const newObj = { ...obj };
+        newObj.id = Date.now().toString() + Math.random().toString(36).substr(2, 5);
+        if (Array.isArray(obj.children)) {
+            newObj.children = obj.children.map(child => deepCopy(child));
+        }
+        if (Array.isArray(obj.completionDates)) {
+            newObj.completionDates = [...obj.completionDates];
+        }
+        return newObj;
+    }
+    execute(() => {
+        const copied = deepCopy(task);
+        parent.children.push(copied);
+    });
+    return true;
+}
 function buildIdMap(list) {
     idMap.clear();
     if (!Array.isArray(list)) return;
@@ -440,10 +461,11 @@ function toggleTaskCollapse(event) {
     if (!li) return;
     const path = li.dataset.path.split(",").map(Number);
     const { task } = getTaskByPath(path);
+
+    if (!Array.isArray(task.children)) task.children = [];
     if (event.target.matches(".toggle-btn")) {
         execute(() => { task.collapsed = !task.collapsed; });
     } else if (event.target.matches(".add-child-btn")) {
-        if (!Array.isArray(task.children)) task.children = [];
         openTaskEditor(newTask(), task.children, true);
     } else if (event.target.matches(".edit-btn")) {
         openTaskEditor(task, null, false);
@@ -550,7 +572,7 @@ function openEditor(options) {
     document.querySelector(".editor")?.remove();
     showPageDim();
     const editor = document.createElement("div");
-    editor.className = "editor";
+    editor.className = "editor container";
 
     // 標題（可選）
     if (options.title) {
@@ -596,16 +618,30 @@ function openEditor(options) {
         };
         editorButtons.append(saveBtn);
 
-        if (!options.isNew && typeof options.onDelete === "function") {
+        if (typeof options.onDelete === "function") {
             const deleteBtn = document.createElement("button");
-            deleteBtn.textContent = "刪除";
+            deleteBtn.textContent = "刪除 ";
             deleteBtn.onclick = () => {
                 if (options.onDelete() === true) {
                     editor.remove();
                     hidePageDim();
                 }
             };
+            createIcon("fa-trash-can", deleteBtn);
             editorButtons.append(deleteBtn);
+        }
+
+        if (typeof options.onCopy === "function") {
+            const copyBtn = document.createElement("button");
+            copyBtn.textContent = "複製 ";
+            copyBtn.onclick = () => {
+                if (options.onCopy() === true) {
+                    editor.remove();
+                    hidePageDim();
+                }
+            };
+            createIcon("fa-copy", copyBtn);
+            editorButtons.append(copyBtn);
         }
 
         const cancelBtn = document.createElement("button");
@@ -627,15 +663,15 @@ function openTaskEditor(task, parentArray, isNew) {
         fields: createTaskFields(task),
         swatchId: task.swatchId,
         onSwatchChange: swatchId => task.swatchId = swatchId,
-        isNew,
         onSave: editor => {
             execute(() => {
                 task.title = editor.querySelector("#edit-title").value.trim() || "（未命名）";
                 task.intervalDays = +editor.querySelector("#edit-interval").value || 0;
-                if (isNew && parentArray) parentArray.push(task);
+                if (parentArray) parentArray.push(task);
             });
         },
-        onDelete: !isNew ? () => deleteTask(task) : null
+        onDelete: !isNew ? () => deleteTask(task) : null,
+        onCopy: !isNew ?() => copyTask(task) : null
     });
 }
 function createTaskFields(task) {
@@ -1011,6 +1047,7 @@ function renderTasks() {
 
     const scrollSyncDiv = document.createElement("div");
     scrollSyncDiv.appendChild(treeRoot);
+    taskRoot.appendChild(scrollSyncDiv);
 
     if (!showTodayTasksOnly) {
         treeRoot.className = "outdent tree-column";
@@ -1022,16 +1059,15 @@ function renderTasks() {
         calendarColumn.setAttribute("data-scrollable", "");
         calendarColumn.appendChild(calendarTable);
         scrollSyncDiv.appendChild(calendarColumn);
+
+        const addTaskBtn = document.createElement("button");
+        addTaskBtn.className = "full-width-btn";
+        addTaskBtn.textContent = "➕ 新增任務";
+        addTaskBtn.type = "button";
+        addTaskBtn.addEventListener("click", () => openTaskEditor(newTask(), rootTask.children, true));
+
+        taskRoot.appendChild(addTaskBtn);
     }
-
-    const addTaskBtn = document.createElement("button");
-    addTaskBtn.className = "full-width-btn";
-    addTaskBtn.textContent = "➕ 新增任務";
-    addTaskBtn.type = "button";
-    addTaskBtn.addEventListener("click", () => openTaskEditor(newTask(), rootTask.children, true));
-
-    taskRoot.appendChild(scrollSyncDiv);
-    taskRoot.appendChild(addTaskBtn);
 }
 function renderTree(data, parentEl, path = [0]) {
     const ul = document.createElement("ul");

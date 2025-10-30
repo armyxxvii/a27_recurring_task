@@ -229,11 +229,7 @@ ul.task-tree {
     left: 50%;
     transform: translate(-50%, -50%);
     background: #fff;
-    border: 1px solid #999;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-    padding: 1rem;
-    border-radius: 8px;
-    width: 250px;
+    width: 90%;
 }
 
     .editor label {
@@ -251,7 +247,8 @@ ul.task-tree {
 
 .editor-buttons {
     display: flex;
-    justify-content: space-between;
+    gap: 0.3rem;
+    justify-content: flex-end;
     margin-top: 1rem;
 }
 
@@ -263,7 +260,6 @@ ul.task-tree {
 }
 
 .swatch {
-    width: 24px;
     height: 24px;
     border: 1px solid #aaa;
     border-radius: 4px;
