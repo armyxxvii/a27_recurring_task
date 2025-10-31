@@ -57,6 +57,7 @@ let isSortableEnabled = false;
 let showTodayTasksOnly = false;
 
 let currentUser = null;
+let monthData = null;
 let currentMonth = null;
 
 // ===========================
@@ -807,11 +808,12 @@ async function showLogin() {
                     const data = await res.json();
                     if (data.success) {
                         currentUser = user;
+                        monthData = data;
                         localSave(KEYS.LAST_USER, user);
                         showToast("登入成功：" + user);
                         editor.remove();
 
-                        await showMonthSelection(data);
+                        await showMonthSelection();
                         renderControls();
                     } else {
                         editor.style.display = "block";
@@ -832,8 +834,8 @@ async function showLogin() {
     });
 }
 
-async function showMonthSelection(data) {
-    if (!data.months || data.months.length === 0) {
+async function showMonthSelection() {
+    if (!monthData || !monthData.months || monthData.months.length === 0) {
         showToast("無可用的任務月份");
         return;
     }
@@ -842,13 +844,13 @@ async function showMonthSelection(data) {
     label.textContent = "選擇月份：";
     const select = document.createElement("select");
     select.id = "month-select";
-    data.months.forEach(month => {
+    monthData.months.forEach(month => {
         const option = document.createElement("option");
         option.value = month;
         option.textContent = month;
         select.appendChild(option);
     });
-    select.value = localLoad(KEYS.LAST_MONTH) || data.months[0];
+    select.value = localLoad(KEYS.LAST_MONTH) || monthData.months[0];
     label.appendChild(select);
 
     openEditor({
@@ -1000,7 +1002,7 @@ function renderControls() {
     openBtn.title = "從 Google Sheets 讀取資料";
     openBtn.type = "button";
     createIcon("fa-cloud-arrow-down", openBtn);
-    openBtn.onclick = fetchDataFromGoogleSheet;
+    openBtn.onclick = showMonthSelection;
     controls.appendChild(openBtn);
 
     const saveBtn = document.createElement("button");
@@ -1010,7 +1012,6 @@ function renderControls() {
     saveBtn.onclick = saveDataToGoogleSheet;
     controls.appendChild(saveBtn);
 
-    // 新增「產生下一個月」按鈕
     const nextMonthBtn = document.createElement("button");
     nextMonthBtn.title = "產生下個月";
     nextMonthBtn.type = "button";
@@ -1097,7 +1098,6 @@ function renderTree(data, parentEl, path = [0]) {
                 ? evt.to.parentElement.dataset.path.split(",").map(Number)
                 : [0];
 
-            // 防止將任務拖曳到自己的子孫節點
             if (
                 toParentPath.length >= fromPath.length &&
                 toParentPath.slice(0, fromPath.length).every((v, i) => v === fromPath[i])
