@@ -385,7 +385,7 @@ function copyTask(task) {
     const { parent } = getTaskByPath(path);
     function deepCopy(obj) {
         const newObj = { ...obj };
-        newObj.id = Date.now().toString() + Math.random().toString(36).substr(2, 5);
+        newObj.id = Date.now().toString() + Math.random().toString(36).substring(2, 5);
         if (Array.isArray(obj.children)) {
             newObj.children = obj.children.map(child => deepCopy(child));
         }
@@ -856,7 +856,6 @@ async function showMonthSelection() {
     openEditor({
         title: "選擇任務月份",
         fields: [label],
-        isNew: true,
         buttons: [
             {
                 text: "確定",
@@ -916,7 +915,7 @@ function refreshAll() {
     });
 }
 function generateUniqueId() {
-    return `list-${Math.random().toString(36).substr(2, 9)}`;
+    return `list-${Math.random().toString(36).substring(2, 9)}`;
 }
 function clearChildren(parent) {
     while (parent.firstChild) parent.removeChild(parent.firstChild);
