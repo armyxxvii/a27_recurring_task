@@ -55,6 +55,7 @@ let calendarEndDate = null;
 let toggleSortableBtn;
 let isSortableEnabled = false;
 let showTodayTasksOnly = false;
+let showTasksList = false;
 
 let currentUser = null;
 let monthData = null;
@@ -149,7 +150,7 @@ async function uploadDataToGoogleSheet(user, month, data) {
 function localSave(key, value) {
     localStorage.setItem(key, value);
 }
-function localLoad(key) { 
+function localLoad(key) {
     return localStorage.getItem(key);
 }
 function getCurrentData() {
@@ -672,7 +673,7 @@ function openTaskEditor(task, parentArray, isNew) {
             });
         },
         onDelete: !isNew ? () => deleteTask(task) : null,
-        onCopy: !isNew ?() => copyTask(task) : null
+        onCopy: !isNew ? () => copyTask(task) : null
     });
 }
 function createTaskFields(task) {
@@ -944,21 +945,67 @@ function toggleSortable() {
     });
     refreshToggleSortableBtn();
 }
-function getShowTasks() {
-    let tasksToShow = rootTask.children;
-    if (showTodayTasksOnly) {
-        const isScheduledToday = task => (task.completionDates || []).some(date => formatDate(parseDate(date)) === todayStr);
-        tasksToShow = flattenTasks(tasksToShow).filter(isScheduledToday);
-    }
-    return tasksToShow;
+function getAllTasks() {
+    return rootTask.children;
 }
-function refreshShowTodayTasksBtn() {
+
+function getTodayTreeTasks() {
+    function todayFilter(tasks) {
+        const result = [];
+        for (const task of tasks) {
+            let filteredChildren = [];
+            if (Array.isArray(task.children) && task.children.length > 0) {
+                filteredChildren = todayFilter(task.children);
+            }
+            const isToday = (task.completionDates || []).some(date => formatDate(parseDate(date)) === todayStr);
+            if (isToday || filteredChildren.length > 0) {
+                result.push({
+                    ...task,
+                    children: filteredChildren
+                });
+            }
+        }
+        return result;
+    }
+
+    return todayFilter(rootTask.children);
+}
+
+function getTodayFlatTasks() {
+    return flattenTasks(rootTask.children).filter(task => {
+        const isToday = (task.completionDates || []).some(date => formatDate(parseDate(date)) === todayStr);
+        return isToday;
+    });
+}
+
+function getShowTasks() {
+    if (!showTodayTasksOnly)
+        return getAllTasks();
+
+    if (showTasksList)
+        return getTodayFlatTasks();
+    else
+        return getTodayTreeTasks();
+}
+function refreshShowOnlyTodayBtn() {
     showTodayTasksBtn.classList.toggle("enabled", showTodayTasksOnly);
     showTodayTasksBtn.title = showTodayTasksOnly ? "顯示全部任務" : "只顯示今日有排程的任務";
 }
-function toggleShowTodayTasksOnly() {
+function refreshToggleTodayTreeBtn() {
+    if (!toggleTodayTreeBtn) return;
+    toggleTodayTreeBtn.dataset.enabled = showTodayTasksOnly ? true : false;
+    toggleTodayTreeBtn.classList.toggle("enabled", showTasksList);
+    toggleTodayTreeBtn.title = "今日任務清單";
+}
+function toggleShowOnlyToday() {
     showTodayTasksOnly = !showTodayTasksOnly;
-    refreshShowTodayTasksBtn();
+    refreshShowOnlyTodayBtn();
+    refreshToggleTodayTreeBtn();
+    refreshAll();
+}
+function toggleShowTasksList() {
+    showTasksList = !showTasksList;
+    refreshToggleTodayTreeBtn();
     refreshAll();
 }
 
@@ -977,11 +1024,18 @@ function renderControls() {
     controls.appendChild(toggleSortableBtn);
 
     showTodayTasksBtn = document.createElement("button");
-    refreshShowTodayTasksBtn();
+    refreshShowOnlyTodayBtn();
     showTodayTasksBtn.type = "button";
     createIcon("fa-calendar-day", showTodayTasksBtn);
-    showTodayTasksBtn.onclick = toggleShowTodayTasksOnly;
+    showTodayTasksBtn.onclick = toggleShowOnlyToday;
     controls.appendChild(showTodayTasksBtn);
+
+    toggleTodayTreeBtn = document.createElement("button");
+    refreshToggleTodayTreeBtn();
+    toggleTodayTreeBtn.type = "button";
+    createIcon("fa-list", toggleTodayTreeBtn);
+    toggleTodayTreeBtn.onclick = toggleShowTasksList;
+    controls.appendChild(toggleTodayTreeBtn);
 
     const undoBtn = document.createElement("button");
     undoBtn.title = "撤銷";
@@ -1043,13 +1097,29 @@ function renderTasks() {
     treeRoot.id = "task-tree-root";
     treeRoot.className = "outdent";
     treeRoot.addEventListener("click", toggleTaskCollapse);
-    renderTree(getShowTasks(), treeRoot);
+
+    let needRenderCalender = !showTodayTasksOnly;
+    if (showTodayTasksOnly && showTasksList) {
+        // 平面模式
+        const flatTasks = getShowTasks();
+        const ul = document.createElement("ul");
+        ul.className = "task-tree";
+        flatTasks.forEach((task, i) => {
+            const li = createTaskNode(task, [i]);
+            ul.appendChild(li);
+        });
+        treeRoot.appendChild(ul);
+    } else {
+        // 樹狀模式
+        renderTree(getShowTasks(), treeRoot);
+        needRenderCalender = true;
+    }
 
     const scrollSyncDiv = document.createElement("div");
     scrollSyncDiv.appendChild(treeRoot);
     taskRoot.appendChild(scrollSyncDiv);
 
-    if (!showTodayTasksOnly) {
+    if (needRenderCalender) {
         treeRoot.className = "outdent tree-column";
         scrollSyncDiv.className = "scroll-sync";
 
@@ -1059,7 +1129,9 @@ function renderTasks() {
         calendarColumn.setAttribute("data-scrollable", "");
         calendarColumn.appendChild(calendarTable);
         scrollSyncDiv.appendChild(calendarColumn);
+    }
 
+    if (!showTodayTasksOnly) {
         const addTaskBtn = document.createElement("button");
         addTaskBtn.className = "full-width-btn";
         addTaskBtn.textContent = "➕ 新增任務";
@@ -1069,6 +1141,9 @@ function renderTasks() {
         taskRoot.appendChild(addTaskBtn);
     }
 }
+function renderList(data, parentEl) {
+
+}
 function renderTree(data, parentEl, path = [0]) {
     const ul = document.createElement("ul");
     ul.className = "task-tree";
@@ -1076,7 +1151,7 @@ function renderTree(data, parentEl, path = [0]) {
     data.forEach((task, i) => {
         const nodePath = [...path, i];
         const li = createTaskNode(task, nodePath);
-        const needRenderChildren = !task.collapsed && !showTodayTasksOnly;
+        const needRenderChildren = showTodayTasksOnly || !task.collapsed;
 
         if (task.children?.length > 0 && needRenderChildren) {
             renderTree(task.children, li, nodePath);
@@ -1109,7 +1184,6 @@ function renderTree(data, parentEl, path = [0]) {
                 const { parent: fromParent, index: fromIdx, task: movedTask } = getTaskByPath(fromPath);
                 const { task: toParent } = getTaskByPath(toParentPath);
 
-                //console.log("From:", fromPath, "To parent:", toParentPath, "index:", evt.newIndex); // 調試輸出
                 fromParent.children.splice(fromIdx, 1);
                 toParent.children.splice(evt.newIndex, 0, movedTask);
             });
@@ -1182,16 +1256,9 @@ function renderCalendar(thead, tbody) {
     });
     thead.appendChild(headFrag);
 
-    let tasksToShow;
-    if (showTodayTasksOnly) {
-        tasksToShow = getShowTasks();
-    }
-    else {
-        tasksToShow = flattenTasks(rootTask.children);
-    }
-
     const bodyFrag = document.createDocumentFragment();
-    tasksToShow.forEach(task => {
+    const flatTasks = flattenTasks(getShowTasks());
+    flatTasks.forEach(task => {
         const tr = createCalendarRow(task, dsArr, colors);
         bodyFrag.appendChild(tr);
     });

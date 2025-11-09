@@ -139,6 +139,7 @@ h6 {
    全寬度按鈕
 =========================== */
 .full-width-btn {
+    flex-grow: 1;
     height: 23px;
     width: -webkit-fill-available;
     margin-top: 1px;
@@ -157,9 +158,9 @@ h6 {
    任務樹樣式
 =========================== */
 .tree-column {
+    flex-grow: 1;
     flex-shrink: 0;
-    width: 50%;
-    max-width: 220px;
+    max-width : 50%;
     padding: 25px 0 0 0;
     border: none;
 }
