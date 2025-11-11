@@ -54,8 +54,10 @@ let calendarStartDate = null;
 let calendarEndDate = null;
 let toggleSortableBtn;
 let isSortableEnabled = false;
-let showTodayTasksOnly = false;
-let showTasksList = false;
+let showOnedayBtn;
+let isShowOneday = false;
+let toggleTaskListBtn;
+let isShowTaskList = false;
 
 let currentUser = null;
 let monthData = null;
@@ -333,7 +335,7 @@ function diffDays(task, prevCompDate, targetDate) {
 }
 function generateDates() {
     const result = [];
-    if (showTodayTasksOnly) {
+    if (isShowOneday) {
         result.push(today);
         return result;
     }
@@ -422,7 +424,7 @@ function flattenTasks(data, parentPath = [], visible = true) {
     data.forEach(task => {
         const path = [...parentPath, task.title];
         if (visible) list.push({ ...task, fullTitle: path.join(" / ") });
-        const showChildren = !task.collapsed || showTodayTasksOnly;
+        const showChildren = !task.collapsed || isShowOneday;
         if (showChildren && task.children?.length) {
             list.push(...flattenTasks(task.children, path, showChildren));
         }
@@ -945,11 +947,8 @@ function toggleSortable() {
     });
     refreshToggleSortableBtn();
 }
-function getAllTasks() {
-    return rootTask.children;
-}
 
-function getTodayTreeTasks() {
+function getOnedayTreeTasks() {
     function todayFilter(tasks) {
         const result = [];
         for (const task of tasks) {
@@ -970,42 +969,40 @@ function getTodayTreeTasks() {
 
     return todayFilter(rootTask.children);
 }
-
-function getTodayFlatTasks() {
+function getOnedayFlatTasks() {
     return flattenTasks(rootTask.children).filter(task => {
         const isToday = (task.completionDates || []).some(date => formatDate(parseDate(date)) === todayStr);
         return isToday;
     });
 }
-
 function getShowTasks() {
-    if (!showTodayTasksOnly)
-        return getAllTasks();
+    if (!isShowOneday)
+        return rootTask.children;
 
-    if (showTasksList)
-        return getTodayFlatTasks();
+    if (isShowTaskList)
+        return getOnedayFlatTasks();
     else
-        return getTodayTreeTasks();
+        return getOnedayTreeTasks();
 }
-function refreshShowOnlyTodayBtn() {
-    showTodayTasksBtn.classList.toggle("enabled", showTodayTasksOnly);
-    showTodayTasksBtn.title = showTodayTasksOnly ? "顯示全部任務" : "只顯示今日有排程的任務";
+function refreshShowOnedayBtn() {
+    showOnedayBtn.classList.toggle("enabled", isShowOneday);
+    showOnedayBtn.title = isShowOneday ? "顯示全部任務" : "只顯示今日有排程的任務";
 }
-function refreshToggleTodayTreeBtn() {
-    if (!toggleTodayTreeBtn) return;
-    toggleTodayTreeBtn.dataset.enabled = showTodayTasksOnly ? true : false;
-    toggleTodayTreeBtn.classList.toggle("enabled", showTasksList);
-    toggleTodayTreeBtn.title = "今日任務清單";
+function refreshToggleTaskListBtn() {
+    if (!toggleTaskListBtn) return;
+    toggleTaskListBtn.dataset.enabled = isShowOneday ? true : false;
+    toggleTaskListBtn.classList.toggle("enabled", isShowTaskList);
+    toggleTaskListBtn.title = "今日任務清單";
 }
-function toggleShowOnlyToday() {
-    showTodayTasksOnly = !showTodayTasksOnly;
-    refreshShowOnlyTodayBtn();
-    refreshToggleTodayTreeBtn();
+function toggleShowOneday() {
+    isShowOneday = !isShowOneday;
+    refreshShowOnedayBtn();
+    refreshToggleTaskListBtn();
     refreshAll();
 }
 function toggleShowTasksList() {
-    showTasksList = !showTasksList;
-    refreshToggleTodayTreeBtn();
+    isShowTaskList = !isShowTaskList;
+    refreshToggleTaskListBtn();
     refreshAll();
 }
 
@@ -1023,19 +1020,19 @@ function renderControls() {
     toggleSortableBtn.onclick = toggleSortable;
     controls.appendChild(toggleSortableBtn);
 
-    showTodayTasksBtn = document.createElement("button");
-    refreshShowOnlyTodayBtn();
-    showTodayTasksBtn.type = "button";
-    createIcon("fa-calendar-day", showTodayTasksBtn);
-    showTodayTasksBtn.onclick = toggleShowOnlyToday;
-    controls.appendChild(showTodayTasksBtn);
+    showOnedayBtn = document.createElement("button");
+    refreshShowOnedayBtn();
+    showOnedayBtn.type = "button";
+    createIcon("fa-calendar-day", showOnedayBtn);
+    showOnedayBtn.onclick = toggleShowOneday;
+    controls.appendChild(showOnedayBtn);
 
-    toggleTodayTreeBtn = document.createElement("button");
-    refreshToggleTodayTreeBtn();
-    toggleTodayTreeBtn.type = "button";
-    createIcon("fa-list", toggleTodayTreeBtn);
-    toggleTodayTreeBtn.onclick = toggleShowTasksList;
-    controls.appendChild(toggleTodayTreeBtn);
+    toggleTaskListBtn = document.createElement("button");
+    refreshToggleTaskListBtn();
+    toggleTaskListBtn.type = "button";
+    createIcon("fa-list", toggleTaskListBtn);
+    toggleTaskListBtn.onclick = toggleShowTasksList;
+    controls.appendChild(toggleTaskListBtn);
 
     const undoBtn = document.createElement("button");
     undoBtn.title = "撤銷";
@@ -1098,8 +1095,8 @@ function renderTasks() {
     treeRoot.className = "outdent";
     treeRoot.addEventListener("click", toggleTaskCollapse);
 
-    let needRenderCalender = !showTodayTasksOnly;
-    if (showTodayTasksOnly && showTasksList) {
+    let needRenderCalender = !isShowOneday;
+    if (isShowOneday && isShowTaskList) {
         // 平面模式
         const flatTasks = getShowTasks();
         const ul = document.createElement("ul");
@@ -1131,7 +1128,7 @@ function renderTasks() {
         scrollSyncDiv.appendChild(calendarColumn);
     }
 
-    if (!showTodayTasksOnly) {
+    if (!isShowOneday) {
         const addTaskBtn = document.createElement("button");
         addTaskBtn.className = "full-width-btn";
         addTaskBtn.textContent = "➕ 新增任務";
@@ -1151,7 +1148,7 @@ function renderTree(data, parentEl, path = [0]) {
     data.forEach((task, i) => {
         const nodePath = [...path, i];
         const li = createTaskNode(task, nodePath);
-        const needRenderChildren = showTodayTasksOnly || !task.collapsed;
+        const needRenderChildren = isShowOneday || !task.collapsed;
 
         if (task.children?.length > 0 && needRenderChildren) {
             renderTree(task.children, li, nodePath);
