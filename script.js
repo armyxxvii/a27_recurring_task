@@ -48,7 +48,6 @@ const rootTask = {
     children: []
 };
 
-let tasks = [];
 let lists = [];
 let memos = [];
 let toggleSortableBtn;
@@ -1239,9 +1238,9 @@ function createTaskNode(task, path) {
 }
 
 function renderCalendar(thead, tbody) {
-    const DateStrs = generateDateStrings();
+    const dateStrs = generateDateStrings();
     const headFrag = document.createDocumentFragment();
-    DateStrs.forEach(ds => {
+    dateStrs.forEach(ds => {
         const th = document.createElement("th");
         th.textContent = ds.slice(5);
         th.dataset.date = ds;
@@ -1255,31 +1254,34 @@ function renderCalendar(thead, tbody) {
     const bodyFrag = document.createDocumentFragment();
     const flatTasks = flattenTasks(getShowTasks());
     flatTasks.forEach(task => {
-        const tr = createCalendarRow(task, DateStrs, colors);
+        const tr = createCalendarRow(task, dateStrs);
         bodyFrag.appendChild(tr);
     });
     tbody.appendChild(bodyFrag);
 }
-function createCalendarRow(task, dsArr, colors) {
+function createCalendarRow(task, dateRangeStr) {
+    const dateRange = (dateRangeStr || []).map(parseDate);
+    const compDates = (task.completionDates || []).map(parseDate);
     const tr = document.createElement("tr");
     tr.style.background = colors[task.swatchId] || "transparent";
-    const compDates = (task.completionDates || []);
 
-    dsArr.forEach(workDateStr => {
-        const workDate = parseDate(workDateStr);
+    dateRange.forEach(workDate => {
+        const workDateStr = formatDate(workDate);
         const td = document.createElement("td");
-        const prevCompDate = compDates.find(date => date <= workDate) || null;
 
-        if (compDates.some(date => date === workDateStr)) {
-            td.classList.add(workDate <= today ? "done-past" : "done-future");
-            createIcon(workDate <= today ? "fa-check" : "fa-paperclip", td);
-        } else if (prevCompDate) {
-            const diff = diffDays(task, prevCompDate, workDate);
-            td.classList.add(diff >= 0 ? "pending" : "overdue");
-            td.textContent = String(Math.abs(diff));
+        if (task.completionDates.some(str => str == workDateStr)) {
+            td.classList.add(workDate < today ? "done-past" : "done-future");
+            createIcon(workDate < today ? "fa-check" : "fa-paperclip", td);
         } else {
-            td.classList.add("normal");
-            td.textContent = ".";
+            const prevCompDate = compDates.find(date => date <= workDate) || null;
+            if (prevCompDate) {
+                const diff = diffDays(task, prevCompDate, workDate);
+                td.classList.add(diff >= 0 ? "pending" : "overdue");
+                td.textContent = String(Math.abs(diff));
+            } else {
+                td.classList.add("normal");
+                td.textContent = ".";
+            }
         }
 
         if (holidayDates.has(workDateStr)) td.classList.add("holiday");
@@ -1451,5 +1453,5 @@ function createListTable(list) {
 // ===========================
 calendarStart.addEventListener("change", refreshAll);
 calendarEnd.addEventListener("change", refreshAll);
-calendarSelected.addEventListener("change",  refreshAll);
+calendarSelected.addEventListener("change", refreshAll);
 document.addEventListener("DOMContentLoaded", showLogin);
