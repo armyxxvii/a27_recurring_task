@@ -5,6 +5,7 @@ const titleUser = document.getElementById("title-user");
 const titleMonth = document.getElementById("title-month");
 const calendarStart = document.getElementById("calendar-start");
 const calendarEnd = document.getElementById("calendar-end");
+const calendarSelected = document.getElementById("selected-date");
 const toast = document.getElementById("save-toast");
 const taskRoot = document.getElementById("task-root");
 const listRoot = document.getElementById("list-root");
@@ -50,8 +51,6 @@ const rootTask = {
 let tasks = [];
 let lists = [];
 let memos = [];
-let calendarStartDate = null;
-let calendarEndDate = null;
 let toggleSortableBtn;
 let isSortableEnabled = false;
 let showOnedayBtn;
@@ -85,8 +84,6 @@ async function fetchDataFromGoogleSheet() {
         holidayDates.clear();
         (data.holidays || []).forEach(d => holidayDates.add(d));
         if (data.calendarRange) {
-            calendarStartDate = data.calendarRange.start ? parseDate(data.calendarRange.start) : null;
-            calendarEndDate = data.calendarRange.end ? parseDate(data.calendarRange.end) : null;
             calendarStart.value = data.calendarRange.start || "";
             calendarEnd.value = data.calendarRange.end || "";
         }
@@ -161,8 +158,8 @@ function getCurrentData() {
     return {
         holidays: Array.from(holidayDates),
         calendarRange: {
-            start: calendarStartDate ? formatDate(calendarStartDate) : null,
-            end: calendarEndDate ? formatDate(calendarEndDate) : null
+            start: calendarStart.value ? calendarStart.value : null,
+            end: calendarEnd.value ? calendarEnd.value : null
         },
         tasks: rootTask.children,
         memos,
@@ -247,8 +244,8 @@ function getCurrentState() {
         lists: JSON.parse(JSON.stringify(lists)),
         memos: JSON.parse(JSON.stringify(memos)),
         holidayDates: new Set(holidayDates),
-        calendarStartDate,
-        calendarEndDate
+        calendarStartDate: calendarStart.value,
+        calendarEndDate: calendarEnd.value
     };
 }
 function saveState() {
@@ -267,8 +264,8 @@ function undo() {
     memos = previousState.memos;
     holidayDates.clear();
     previousState.holidayDates.forEach(date => holidayDates.add(date));
-    calendarStartDate = previousState.calendarStartDate;
-    calendarEndDate = previousState.calendarEndDate;
+    calendarStart.value = previousState.calendarStartDate;
+    calendarEnd.value = previousState.calendarEndDate;
     showToast("已撤銷");
     refreshAll();
     document.body.classList.add("unsaved");
@@ -285,8 +282,8 @@ function redo() {
     memos = nextState.memos;
     holidayDates.clear();
     nextState.holidayDates.forEach(date => holidayDates.add(date));
-    calendarStartDate = nextState.calendarStartDate;
-    calendarEndDate = nextState.calendarEndDate;
+    calendarStart.value = nextState.calendarStartDate;
+    calendarEnd.value = nextState.calendarEndDate;
     showToast("已重做");
     refreshAll();
     document.body.classList.add("unsaved");
@@ -328,32 +325,26 @@ function sortDates() {
     recurSort(rootTask.children);
 }
 function diffDays(task, prevCompDate, targetDate) {
+    const target = parseDate(targetDate);
     const last = parseDate(prevCompDate);
     const next = new Date(last.getTime() + task.intervalDays * dayMs);
-    const target = parseDate(targetDate);
     return Math.ceil((next - target) / dayMs);
 }
-function generateDates() {
+function generateDateStrings() {
     const result = [];
     if (isShowOneday) {
-        result.push(today);
+        result.push(calendarSelected.value);
         return result;
     }
 
-    const start = calendarStartDate || today;
-    const end = calendarEndDate || new Date(start.getTime() + 14 * 86400000);
+    const start = parseDate(calendarStart.value) || today;
+    const end = parseDate(calendarEnd.value) || start + 14 * dayMs;
     let cursor = new Date(start);
     while (cursor <= end) {
-        result.push(new Date(cursor));
+        result.push(formatDate(cursor));
         cursor.setDate(cursor.getDate() + 1);
     }
     return result;
-}
-function updateDateRange() {
-    execute(() => {
-        calendarStartDate = calendarStart.value ? parseDate(calendarStart.value) : null;
-        calendarEndDate = calendarEnd.value ? parseDate(calendarEnd.value) : null;
-    });
 }
 
 // ===========================
@@ -402,6 +393,11 @@ function copyTask(task) {
         parent.children.push(copied);
     });
     return true;
+}
+function isTaskCompletedOnSelectedDate(task) {
+    if (!Array.isArray(task.completionDates)) return false;
+
+    return task.completionDates.some(date => date === calendarSelected.value);
 }
 function buildIdMap(list) {
     idMap.clear();
@@ -802,7 +798,7 @@ async function showLogin() {
                         showToast("請輸入暱稱");
                         return;
                     }
-                    editor.style.display = "none";
+                    editor.classList.toggle("hidden", true);
                     // 註冊/登入
                     const res = await fetch(url + `?action=login&user=${encodeURIComponent(user)}`, {
                         method: "GET",
@@ -816,10 +812,9 @@ async function showLogin() {
                         showToast("登入成功：" + user);
                         editor.remove();
 
-                        await showMonthSelection();
-                        renderControls();
+                        showMonthSelection();
                     } else {
-                        editor.style.display = "block";
+                        editor.classList.toggle("hidden", false);
                         showToast("登入失敗，請重試");
                     }
                 }
@@ -873,6 +868,9 @@ async function showMonthSelection() {
                     currentMonth = selectedMonth;
                     editor.remove();
                     await fetchDataFromGoogleSheet();
+
+                    calendarSelected.value = todayStr;
+                    renderControls();
                 }
             }
         ]
@@ -930,7 +928,6 @@ function createIcon(iconClass, parentElement) {
 }
 function refreshToggleSortableBtn() {
     toggleSortableBtn.classList.toggle("enabled", isSortableEnabled);
-    //toggleSortableBtn.dataset.enabled = isSortableEnabled ? "true" : "false";
     toggleSortableBtn.title = isSortableEnabled ? "禁用排序" : "啟用排序";
 }
 function toggleSortable() {
@@ -949,15 +946,15 @@ function toggleSortable() {
 }
 
 function getOnedayTreeTasks() {
-    function todayFilter(tasks) {
+    function dateFilter(tasks) {
         const result = [];
         for (const task of tasks) {
             let filteredChildren = [];
             if (Array.isArray(task.children) && task.children.length > 0) {
-                filteredChildren = todayFilter(task.children);
+                filteredChildren = dateFilter(task.children);
             }
-            const isToday = (task.completionDates || []).some(date => formatDate(parseDate(date)) === todayStr);
-            if (isToday || filteredChildren.length > 0) {
+
+            if (isTaskCompletedOnSelectedDate(task) || filteredChildren.length > 0) {
                 result.push({
                     ...task,
                     children: filteredChildren
@@ -967,13 +964,10 @@ function getOnedayTreeTasks() {
         return result;
     }
 
-    return todayFilter(rootTask.children);
+    return dateFilter(rootTask.children);
 }
 function getOnedayFlatTasks() {
-    return flattenTasks(rootTask.children).filter(task => {
-        const isToday = (task.completionDates || []).some(date => formatDate(parseDate(date)) === todayStr);
-        return isToday;
-    });
+    return flattenTasks(rootTask.children).filter(task => isTaskCompletedOnSelectedDate(task));
 }
 function getShowTasks() {
     if (!isShowOneday)
@@ -984,20 +978,27 @@ function getShowTasks() {
     else
         return getOnedayTreeTasks();
 }
+
 function refreshShowOnedayBtn() {
     showOnedayBtn.classList.toggle("enabled", isShowOneday);
     showOnedayBtn.title = isShowOneday ? "顯示全部任務" : "只顯示今日有排程的任務";
 }
 function refreshToggleTaskListBtn() {
     if (!toggleTaskListBtn) return;
-    toggleTaskListBtn.dataset.enabled = isShowOneday ? true : false;
+    toggleTaskListBtn.classList.toggle("hidden", !isShowOneday);
     toggleTaskListBtn.classList.toggle("enabled", isShowTaskList);
     toggleTaskListBtn.title = "今日任務清單";
+}
+function refreshDateInputVisible() {
+    calendarStart.classList.toggle("hidden", isShowOneday);
+    calendarEnd.classList.toggle("hidden", isShowOneday);
+    calendarSelected.classList.toggle("hidden", !isShowOneday);
 }
 function toggleShowOneday() {
     isShowOneday = !isShowOneday;
     refreshShowOnedayBtn();
     refreshToggleTaskListBtn();
+    refreshDateInputVisible();
     refreshAll();
 }
 function toggleShowTasksList() {
@@ -1021,14 +1022,12 @@ function renderControls() {
     controls.appendChild(toggleSortableBtn);
 
     showOnedayBtn = document.createElement("button");
-    refreshShowOnedayBtn();
     showOnedayBtn.type = "button";
     createIcon("fa-calendar-day", showOnedayBtn);
     showOnedayBtn.onclick = toggleShowOneday;
     controls.appendChild(showOnedayBtn);
 
     toggleTaskListBtn = document.createElement("button");
-    refreshToggleTaskListBtn();
     toggleTaskListBtn.type = "button";
     createIcon("fa-list", toggleTaskListBtn);
     toggleTaskListBtn.onclick = toggleShowTasksList;
@@ -1068,6 +1067,10 @@ function renderControls() {
     createIcon("fa-calendar-plus", nextMonthBtn);
     nextMonthBtn.onclick = saveNextMonthData;
     controls.appendChild(nextMonthBtn);
+
+    refreshShowOnedayBtn();
+    refreshToggleTaskListBtn();
+    refreshDateInputVisible();
 }
 
 function renderTasks() {
@@ -1137,9 +1140,6 @@ function renderTasks() {
 
         taskRoot.appendChild(addTaskBtn);
     }
-}
-function renderList(data, parentEl) {
-
 }
 function renderTree(data, parentEl, path = [0]) {
     const ul = document.createElement("ul");
@@ -1239,10 +1239,9 @@ function createTaskNode(task, path) {
 }
 
 function renderCalendar(thead, tbody) {
-    const dates = generateDates();
-    const dsArr = dates.map(formatDate);
+    const DateStrs = generateDateStrings();
     const headFrag = document.createDocumentFragment();
-    dsArr.forEach(ds => {
+    DateStrs.forEach(ds => {
         const th = document.createElement("th");
         th.textContent = ds.slice(5);
         th.dataset.date = ds;
@@ -1256,7 +1255,7 @@ function renderCalendar(thead, tbody) {
     const bodyFrag = document.createDocumentFragment();
     const flatTasks = flattenTasks(getShowTasks());
     flatTasks.forEach(task => {
-        const tr = createCalendarRow(task, dsArr, colors);
+        const tr = createCalendarRow(task, DateStrs, colors);
         bodyFrag.appendChild(tr);
     });
     tbody.appendChild(bodyFrag);
@@ -1264,18 +1263,18 @@ function renderCalendar(thead, tbody) {
 function createCalendarRow(task, dsArr, colors) {
     const tr = document.createElement("tr");
     tr.style.background = colors[task.swatchId] || "transparent";
-    const compDates = (task.completionDates || []).map(parseDate);
+    const compDates = (task.completionDates || []);
 
-    dsArr.forEach(ds => {
+    dsArr.forEach(workDateStr => {
+        const workDate = parseDate(workDateStr);
         const td = document.createElement("td");
-        const currDate = parseDate(ds);
-        const prevCompDate = compDates.find(d => d <= currDate) || null;
+        const prevCompDate = compDates.find(date => date <= workDate) || null;
 
-        if (compDates.some(d => formatDate(d) === formatDate(currDate))) {
-            td.classList.add(currDate <= today ? "done-past" : "done-future");
-            createIcon(currDate <= today ? "fa-check" : "fa-paperclip", td);
+        if (compDates.some(date => date === workDateStr)) {
+            td.classList.add(workDate <= today ? "done-past" : "done-future");
+            createIcon(workDate <= today ? "fa-check" : "fa-paperclip", td);
         } else if (prevCompDate) {
-            const diff = diffDays(task, prevCompDate, currDate);
+            const diff = diffDays(task, prevCompDate, workDate);
             td.classList.add(diff >= 0 ? "pending" : "overdue");
             td.textContent = String(Math.abs(diff));
         } else {
@@ -1283,11 +1282,11 @@ function createCalendarRow(task, dsArr, colors) {
             td.textContent = ".";
         }
 
-        if (holidayDates.has(ds)) td.classList.add("holiday");
-        if (ds === todayStr) td.classList.add("today");
+        if (holidayDates.has(workDateStr)) td.classList.add("holiday");
+        if (workDateStr === todayStr) td.classList.add("today");
 
         td.dataset.id = task.id;
-        td.dataset.date = ds;
+        td.dataset.date = workDateStr;
         tr.appendChild(td);
     });
 
@@ -1450,6 +1449,7 @@ function createListTable(list) {
 // ===========================
 // 5. Event delegation
 // ===========================
-calendarStart.addEventListener("change", updateDateRange);
-calendarEnd.addEventListener("change", updateDateRange);
+calendarStart.addEventListener("change", refreshAll);
+calendarEnd.addEventListener("change", refreshAll);
+calendarSelected.addEventListener("change",  refreshAll);
 document.addEventListener("DOMContentLoaded", showLogin);

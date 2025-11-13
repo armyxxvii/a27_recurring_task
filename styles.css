@@ -42,15 +42,18 @@ button i {
         border-radius: 4px;
     }
 
-        .container button:hover {
+        .container button:hover,
+        .container input:hover {
             background: #666;
         }
 
-        .container button.enabled {
+        .container button.enabled,
+        .container input.enabled {
             background: #a00;
         }
 
-            .container button.enabled:hover {
+            .container button.enabled:hover
+            .container input.enabled:hover {
                 background: #f44336;
                 color: white;
             }
@@ -61,6 +64,10 @@ button i {
 
 .outdent {
     margin-left: -0.5rem !important;
+}
+
+.hidden {
+    display: none !important;
 }
 
 h1, h2, h3, h4, h5, h6 {
