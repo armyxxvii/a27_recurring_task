@@ -57,6 +57,9 @@ let isShowOneday = false;
 let toggleTaskListBtn;
 let isShowTaskList = false;
 
+let toggleEditLockBtn;
+let isEditLocked = true;
+
 let currentUser = null;
 let monthData = null;
 let currentMonth = null;
@@ -455,7 +458,7 @@ function findTaskPath(target, data = rootTask, path = [0]) {
     }
     return null;
 }
-function toggleTaskCollapse(event) {
+function onTaskNodeClick(event) {
     const li = event.target.closest(".task-node");
     if (!li) return;
     const path = li.dataset.path.split(",").map(Number);
@@ -768,7 +771,7 @@ function createListFields(list) {
 
 async function showLogin() {
     if (currentUser) {
-        renderControls();
+        refreshAll();
         return;
     }
 
@@ -869,7 +872,7 @@ async function showMonthSelection() {
                     await fetchDataFromGoogleSheet();
 
                     calendarSelected.value = todayStr;
-                    renderControls();
+                    refreshAll();
                 }
             }
         ]
@@ -903,6 +906,7 @@ function refreshAll() {
         scrollPositions.set(el.id, el.scrollLeft);
     });
     buildIdMap(rootTask.children);
+    renderControls();
     renderTasks();
     renderMemos();
     renderLists();
@@ -1006,12 +1010,37 @@ function toggleShowTasksList() {
     refreshAll();
 }
 
+function refreshEditLockBtn() {
+    if (!toggleEditLockBtn) return;
+    toggleEditLockBtn.innerHTML = "";
+    if (isEditLocked) {
+        createIcon("fa-lock", toggleEditLockBtn);
+        toggleEditLockBtn.classList.toggle("enabled", true);
+        toggleEditLockBtn.title = "編輯鎖定（開啟） — 隱藏編輯與新增按鈕，並禁止日曆點擊";
+    } else {
+        createIcon("fa-lock-open", toggleEditLockBtn);
+        toggleEditLockBtn.classList.toggle("enabled", false);
+        toggleEditLockBtn.title = "編輯鎖定（關閉） — 允許編輯";
+    }
+}
+function toggleEditLock() {
+    isEditLocked = !isEditLocked;
+    refreshEditLockBtn();
+    refreshAll();
+}
+
 // ===========================
 // 4b. Render
 // ===========================
 function renderControls() {
     const controls = document.getElementById("controls");
     clearChildren(controls);
+
+    toggleEditLockBtn = document.createElement("button");
+    toggleEditLockBtn.type = "button";
+    toggleEditLockBtn.onclick = toggleEditLock;
+    refreshEditLockBtn();
+    controls.appendChild(toggleEditLockBtn);
 
     toggleSortableBtn = document.createElement("button");
     refreshToggleSortableBtn();
@@ -1080,7 +1109,6 @@ function renderTasks() {
 
     const thead = document.createElement("thead");
     thead.appendChild(headerRow);
-    thead.addEventListener("click", toggleHoliday);
 
     const tbody = document.createElement("tbody");
     tbody.id = "calendar-body";
@@ -1090,12 +1118,10 @@ function renderTasks() {
     calendarTable.appendChild(thead);
     calendarTable.appendChild(tbody);
     renderCalendar(thead, tbody);
-    calendarTable.addEventListener("click", toggleComplete);
 
     const treeRoot = document.createElement("div");
     treeRoot.id = "task-tree-root";
     treeRoot.className = "outdent";
-    treeRoot.addEventListener("click", toggleTaskCollapse);
 
     let needRenderCalender = !isShowOneday;
     if (isShowOneday && isShowTaskList) {
@@ -1130,14 +1156,18 @@ function renderTasks() {
         scrollSyncDiv.appendChild(calendarColumn);
     }
 
-    if (!isShowOneday) {
-        const addTaskBtn = document.createElement("button");
-        addTaskBtn.className = "full-width-btn";
-        addTaskBtn.textContent = "➕ 新增任務";
-        addTaskBtn.type = "button";
-        addTaskBtn.addEventListener("click", () => openTaskEditor(newTask(), rootTask.children, true));
-
-        taskRoot.appendChild(addTaskBtn);
+    if (!isEditLocked) {
+        thead.addEventListener("click", toggleHoliday);
+        calendarTable.addEventListener("click", toggleComplete);
+        treeRoot.addEventListener("click", onTaskNodeClick);
+        if (!isShowOneday) {
+            const addTaskBtn = document.createElement("button");
+            addTaskBtn.className = "full-width-btn";
+            addTaskBtn.textContent = "➕ 新增任務";
+            addTaskBtn.type = "button";
+            addTaskBtn.addEventListener("click", () => openTaskEditor(newTask(), rootTask.children, true));
+            taskRoot.appendChild(addTaskBtn);
+        }
     }
 }
 function renderTree(data, parentEl, path = [0]) {
@@ -1210,15 +1240,17 @@ function createTaskLine(task) {
 
     const ctr = document.createElement("span");
     ctr.className = "controls";
-    const editBtn = document.createElement("button");
-    editBtn.className = "edit-btn";
-    editBtn.title = "編輯任務";
-    createIcon("fa-pencil", editBtn);
-    const addChildBtn = document.createElement("button");
-    addChildBtn.className = "add-child-btn";
-    addChildBtn.title = "新增子任務";
-    createIcon("fa-baby", addChildBtn);
-    ctr.append(editBtn, addChildBtn);
+    if (!isEditLocked) {
+        const editBtn = document.createElement("button");
+        editBtn.className = "edit-btn";
+        editBtn.title = "編輯任務";
+        createIcon("fa-pencil", editBtn);
+        const addChildBtn = document.createElement("button");
+        addChildBtn.className = "add-child-btn";
+        addChildBtn.title = "新增子任務";
+        createIcon("fa-baby", addChildBtn);
+        ctr.append(editBtn, addChildBtn);
+    }
 
     line.append(toggleBtn, titleSpan, ctr);
     return line;
@@ -1315,13 +1347,16 @@ function renderMemos() {
             });
         }
     });
-    const addBtn = document.createElement("button");
-    addBtn.className = "full-width-btn";
-    addBtn.type = "button";
-    addBtn.textContent = "➕ 新增備忘";
-    addBtn.onclick = () => openMemoEditor(newMemo(), memos.length, true);
     memoRoot.appendChild(ul);
-    memoRoot.appendChild(addBtn);
+
+    if (!isEditLocked) {
+        const addBtn = document.createElement("button");
+        addBtn.className = "full-width-btn";
+        addBtn.type = "button";
+        addBtn.textContent = "➕ 新增備忘";
+        addBtn.onclick = () => openMemoEditor(newMemo(), memos.length, true);
+        memoRoot.appendChild(addBtn);
+    }
 }
 function createMemoLine(memo, index, colors) {
     const li = document.createElement("li");
@@ -1335,20 +1370,21 @@ function createMemoLine(memo, index, colors) {
     const textSpan = document.createElement("span");
     textSpan.textContent = memo.text;
     textSpan.className = "task-title memo";
+    line.append(textSpan);
 
-    const editBtn = document.createElement("button");
-    editBtn.className = "edit-btn";
-    editBtn.title = "編輯備忘";
-    createIcon("fa-pencil", editBtn);
-    editBtn.onclick = () => openMemoEditor(memo, index, false);
-
-    const deleteBtn = document.createElement("button");
-    deleteBtn.className = "delete-btn";
-    deleteBtn.title = "刪除備忘";
-    createIcon("fa-trash", deleteBtn);
-    deleteBtn.onclick = () => deleteMemo(index);
-
-    line.append(textSpan, editBtn, deleteBtn);
+    if (!isEditLocked) {
+        const editBtn = document.createElement("button");
+        editBtn.className = "edit-btn";
+        editBtn.title = "編輯備忘";
+        createIcon("fa-pencil", editBtn);
+        editBtn.onclick = () => openMemoEditor(memo, index, false);
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "delete-btn";
+        deleteBtn.title = "刪除備忘";
+        createIcon("fa-trash", deleteBtn);
+        deleteBtn.onclick = () => deleteMemo(index);
+        line.append(editBtn, deleteBtn);
+    }
     li.appendChild(line);
 
     return li;
@@ -1374,13 +1410,16 @@ function renderLists() {
             });
         }
     });
-    const addBtn = document.createElement("button");
-    addBtn.className = "full-width-btn";
-    addBtn.type = "button";
-    addBtn.textContent = "➕ 新增清單";
-    addBtn.onclick = () => openListEditor(newList(), true);
     listRoot.appendChild(ul);
-    listRoot.appendChild(addBtn);
+
+    if (!isEditLocked) {
+        const addBtn = document.createElement("button");
+        addBtn.className = "full-width-btn";
+        addBtn.type = "button";
+        addBtn.textContent = "➕ 新增清單";
+        addBtn.onclick = () => openListEditor(newList(), true);
+        listRoot.appendChild(addBtn);
+    }
 }
 function createListLine(list, index, colors) {
     const li = document.createElement("li");
@@ -1403,25 +1442,29 @@ function createListTitle(list) {
     const title = document.createElement("span");
     title.textContent = list.name;
     title.className = "task-title memo";
-    const btnBar = document.createElement("span");
-    btnBar.className = "controls";
-    const editBtn = document.createElement("button");
-    editBtn.className = "edit-btn";
-    editBtn.title = "編輯清單";
-    createIcon("fa-pencil", editBtn);
-    editBtn.onclick = () => openListEditor(list, false);
-    const clearBtn = document.createElement("button");
-    clearBtn.className = "clear-btn";
-    clearBtn.title = "清除所有完成";
-    createIcon("fa-eraser", clearBtn);
-    clearBtn.onclick = () => clearListDone(list);
-    const deleteBtn = document.createElement("button");
-    deleteBtn.className = "delete-btn";
-    deleteBtn.title = "刪除清單";
-    createIcon("fa-trash", deleteBtn);
-    deleteBtn.onclick = () => deleteList(list.id);
-    btnBar.append(editBtn, clearBtn, deleteBtn);
-    titleRow.append(title, btnBar);
+    titleRow.append(title);
+
+    if (!isEditLocked) {
+        const btnBar = document.createElement("span");
+        btnBar.className = "controls";
+        const editBtn = document.createElement("button");
+        editBtn.className = "edit-btn";
+        editBtn.title = "編輯清單";
+        createIcon("fa-pencil", editBtn);
+        editBtn.onclick = () => openListEditor(list, false);
+        const clearBtn = document.createElement("button");
+        clearBtn.className = "clear-btn";
+        clearBtn.title = "清除所有完成";
+        createIcon("fa-eraser", clearBtn);
+        clearBtn.onclick = () => clearListDone(list);
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "delete-btn";
+        deleteBtn.title = "刪除清單";
+        createIcon("fa-trash", deleteBtn);
+        deleteBtn.onclick = () => deleteList(list.id);
+        btnBar.append(editBtn, clearBtn, deleteBtn);
+        titleRow.append(btnBar);
+    }
     return titleRow;
 }
 function createListTable(list) {
@@ -1438,8 +1481,10 @@ function createListTable(list) {
         const td = document.createElement("td");
         td.textContent = j;
         td.className = list.doneNumbers.includes(j) ? "done-past" : "normal";
-        td.style.cursor = "pointer";
-        td.onclick = () => toggleListItem(list, j);
+        if (!isEditLocked) {
+            td.style.cursor = "pointer";
+            td.onclick = () => toggleListItem(list, j);
+        }
         trBody.appendChild(td);
     }
     tbody.appendChild(trBody);
