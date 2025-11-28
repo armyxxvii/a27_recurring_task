@@ -612,8 +612,6 @@ function openEditor(options) {
         saveBtn.textContent = "儲存";
         saveBtn.onclick = () => {
             options.onSave(editor);
-            // 重設畫面縮放為100%
-            resetPageZoom();
             editor.remove();
             hidePageDim();
         };
@@ -624,8 +622,6 @@ function openEditor(options) {
             deleteBtn.textContent = "刪除 ";
             deleteBtn.onclick = () => {
                 if (options.onDelete() === true) {
-                    // 重設畫面縮放為100%
-                    resetPageZoom();
                     editor.remove();
                     hidePageDim();
                 }
@@ -639,8 +635,6 @@ function openEditor(options) {
             copyBtn.textContent = "複製 ";
             copyBtn.onclick = () => {
                 if (options.onCopy() === true) {
-                    // 重設畫面縮放為100%
-                    resetPageZoom();
                     editor.remove();
                     hidePageDim();
                 }
@@ -652,8 +646,6 @@ function openEditor(options) {
         const cancelBtn = document.createElement("button");
         cancelBtn.textContent = "取消";
         cancelBtn.onclick = () => {
-            // 重設畫面縮放為100%
-            resetPageZoom();
             editor.remove();
             hidePageDim();
         };
@@ -900,20 +892,6 @@ function showPageDim() {
 }
 function hidePageDim() {
     document.getElementById("page-dim-overlay")?.remove();
-}
-
-function resetPageZoom() {
-    try {
-        // 儘量涵蓋常見的做法：CSS zoom（非標準但廣泛支持）與 transform（若有被使用）
-        document.documentElement.style.zoom = "100%";
-        document.body.style.zoom = "100%";
-        // 若先前設置過 transform: scale(...)，也嘗試清除
-        document.documentElement.style.transform = "";
-        document.body.style.transform = "";
-    } catch (e) {
-        // 忽略任何錯誤，避免影響使用者流程
-        console.error("resetPageZoom error:", e);
-    }
 }
 
 // ===========================
