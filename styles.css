@@ -33,6 +33,7 @@ button i {
 }
 
     .container button,
+    .container textarea,
     .container input {
         padding: 0.1rem 0.4rem;
         color: #fff;
@@ -247,6 +248,7 @@ ul.task-tree {
         font-weight: bold;
     }
 
+    .editor textarea,
     .editor input {
         width: 100%;
         padding: 0.3rem;
