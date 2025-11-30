@@ -417,14 +417,18 @@ function buildIdMap(list) {
         }
     }
 }
-function flattenTasks(data, parentPath = [], visible = true) {
+function flattenTasks(data, parentIndexPath = [0], parentTitlePath = [], visible = true) {
     const list = [];
-    data.forEach(task => {
-        const path = [...parentPath, task.title];
-        if (visible) list.push({ ...task, fullTitle: path.join(" / ") });
+    data.forEach((task, i) => {
+        const indexPath = [...parentIndexPath, i];
+        const titlePath = [...parentTitlePath, task.title];
+        if (visible) {
+            // 建立淺拷貝並帶上 origPath、fullTitle（不改變原始 task 物件）
+            list.push({ ...task, fullTitle: titlePath.join(" / "), origPath: indexPath });
+        }
         const showChildren = !task.collapsed || isShowOneday;
         if (showChildren && task.children?.length) {
-            list.push(...flattenTasks(task.children, path, showChildren));
+            list.push(...flattenTasks(task.children, indexPath, titlePath, showChildren));
         }
     });
     return list;
@@ -1104,62 +1108,59 @@ function renderControls() {
 function renderTasks() {
     clearChildren(taskRoot);
 
-    const headerRow = document.createElement("tr");
-    headerRow.id = "date-header";
-
-    const thead = document.createElement("thead");
-    thead.appendChild(headerRow);
-
-    const tbody = document.createElement("tbody");
-    tbody.id = "calendar-body";
-
-    const calendarTable = document.createElement("table");
-    calendarTable.id = "calendar-table";
-    calendarTable.appendChild(thead);
-    calendarTable.appendChild(tbody);
-    renderCalendar(thead, tbody);
+    const scrollSyncDiv = document.createElement("div");
+    taskRoot.appendChild(scrollSyncDiv);
 
     const treeRoot = document.createElement("div");
     treeRoot.id = "task-tree-root";
     treeRoot.className = "outdent";
 
-    let needRenderCalender = !isShowOneday;
-    if (isShowOneday && isShowTaskList) {
-        // 平面模式
-        const flatTasks = getShowTasks();
-        const ul = document.createElement("ul");
-        ul.className = "task-tree";
-        flatTasks.forEach((task, i) => {
-            const li = createTaskNode(task, [i]);
-            ul.appendChild(li);
-        });
-        treeRoot.appendChild(ul);
+    let needRenderCalendar = !isShowOneday;
+    if (isShowOneday) {
+        if (isShowTaskList) {
+            // 平面模式
+            const flatTasks = getOnedayFlatTasks();
+            const ul = document.createElement("ul");
+            ul.className = "task-tree";
+            flatTasks.forEach(task => {
+                const li = createTaskNode(task, task.origPath || [0]);
+                ul.appendChild(li);
+            });
+            treeRoot.appendChild(ul);
+        } else {
+            // 單日樹狀模式
+            renderTree(getShowTasks(), treeRoot);
+            needRenderCalendar = true;
+        }
     } else {
-        // 樹狀模式
-        renderTree(getShowTasks(), treeRoot);
-        needRenderCalender = true;
+        renderTree(rootTask.children, treeRoot);
+        needRenderCalendar = true;
     }
-
-    const scrollSyncDiv = document.createElement("div");
     scrollSyncDiv.appendChild(treeRoot);
-    taskRoot.appendChild(scrollSyncDiv);
 
-    if (needRenderCalender) {
-        treeRoot.className = "outdent tree-column";
-        scrollSyncDiv.className = "scroll-sync";
+    if (needRenderCalendar) {
+        treeRoot.classList.add("tree-column");
+        scrollSyncDiv.classList.add("scroll-sync");
 
         const calendarColumn = document.createElement("div");
         calendarColumn.id = "calendar-column";
         calendarColumn.className = "calendar-column";
         calendarColumn.setAttribute("data-scrollable", "");
+
+        const calendarTable = createCalendarTable();
         calendarColumn.appendChild(calendarTable);
+
         scrollSyncDiv.appendChild(calendarColumn);
     }
 
     if (!isEditLocked) {
-        thead.addEventListener("click", toggleHoliday);
-        calendarTable.addEventListener("click", toggleComplete);
         treeRoot.addEventListener("click", onTaskNodeClick);
+        if (needRenderCalendar) {
+            const calendarTable = document.getElementById("calendar-table");
+            calendarTable.addEventListener("click", toggleComplete);
+            const thead = calendarTable.querySelector("thead");
+            thead.addEventListener("click", toggleHoliday);
+        }
         if (!isShowOneday) {
             const addTaskBtn = document.createElement("button");
             addTaskBtn.className = "full-width-btn";
@@ -1170,11 +1171,11 @@ function renderTasks() {
         }
     }
 }
-function renderTree(data, parentEl, path = [0]) {
+function renderTree(tasks, parentEl, path = [0]) {
     const ul = document.createElement("ul");
     ul.className = "task-tree";
 
-    data.forEach((task, i) => {
+    tasks.forEach((task, i) => {
         const nodePath = [...path, i];
         const li = createTaskNode(task, nodePath);
         const needRenderChildren = isShowOneday || !task.collapsed;
@@ -1214,6 +1215,34 @@ function renderTree(data, parentEl, path = [0]) {
                 toParent.children.splice(evt.newIndex, 0, movedTask);
             });
         }
+    });
+
+    parentEl.appendChild(ul);
+}
+function renderOnedayTree(tasks, parentEl, path = [0]) {
+    const ul = document.createElement("ul");
+    ul.className = "task-tree";
+
+    function hasMatch(task) {
+        if (isTaskCompletedOnSelectedDate(task)) return true;
+        if (!Array.isArray(task.children) || task.children.length === 0) return false;
+        for (const c of task.children) {
+            if (hasMatch(c)) return true;
+        }
+        return false;
+    }
+
+    tasks.forEach((task, i) => {
+        if (!hasMatch(task)) return; // 此節點與子孫皆無符合，略過
+        const nodePath = [...path, i]; // 真正對應 rootTask 的數字索引路徑
+        const li = createTaskNode(task, nodePath);
+
+        // 只對符合條件的子節點遞迴（維持原始索引路徑）
+        if (Array.isArray(task.children) && task.children.length > 0) {
+            renderOnedayTree(task.children, li, nodePath);
+        }
+
+        ul.appendChild(li);
     });
 
     parentEl.appendChild(ul);
@@ -1268,10 +1297,14 @@ function createTaskNode(task, path) {
 
     return node;
 }
+function createCalendarTable() {
+    const calendarTable = document.createElement("table");
+    calendarTable.id = "calendar-table";
+    const thead = document.createElement("thead");
+    const headerRow = document.createElement("tr");
+    headerRow.id = "date-header";
 
-function renderCalendar(thead, tbody) {
     const dateStrs = generateDateStrings();
-    const headFrag = document.createDocumentFragment();
     dateStrs.forEach(ds => {
         const th = document.createElement("th");
         th.textContent = ds.slice(5);
@@ -1279,17 +1312,21 @@ function renderCalendar(thead, tbody) {
         th.title = "點擊設定 / 取消休假日";
         if (holidayDates.has(ds)) th.classList.add("holiday");
         if (ds === todayStr) th.classList.add("today");
-        headFrag.appendChild(th);
+        headerRow.appendChild(th);
     });
-    thead.appendChild(headFrag);
+    thead.appendChild(headerRow);
 
-    const bodyFrag = document.createDocumentFragment();
+    const tbody = document.createElement("tbody");
+    tbody.id = "calendar-body";
+
     const flatTasks = flattenTasks(getShowTasks());
     flatTasks.forEach(task => {
         const tr = createCalendarRow(task, dateStrs);
-        bodyFrag.appendChild(tr);
+        tbody.appendChild(tr);
     });
-    tbody.appendChild(bodyFrag);
+    calendarTable.appendChild(thead);
+    calendarTable.appendChild(tbody);
+    return calendarTable;
 }
 function createCalendarRow(task, dateRangeStr) {
     const dateRange = (dateRangeStr || []).map(parseDate);
