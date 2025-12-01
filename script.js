@@ -1153,7 +1153,7 @@ function renderTasks() {
         scrollSyncDiv.appendChild(calendarColumn);
     }
 
-    if (!isEditLocked) {
+    if (!isShowOneday && !isEditLocked) {
         treeRoot.addEventListener("click", onTaskNodeClick);
         if (needRenderCalendar) {
             const calendarTable = document.getElementById("calendar-table");
@@ -1161,14 +1161,12 @@ function renderTasks() {
             const thead = calendarTable.querySelector("thead");
             thead.addEventListener("click", toggleHoliday);
         }
-        if (!isShowOneday) {
-            const addTaskBtn = document.createElement("button");
-            addTaskBtn.className = "full-width-btn";
-            addTaskBtn.textContent = "➕ 新增任務";
-            addTaskBtn.type = "button";
-            addTaskBtn.addEventListener("click", () => openTaskEditor(newTask(), rootTask.children, true));
-            taskRoot.appendChild(addTaskBtn);
-        }
+        const addTaskBtn = document.createElement("button");
+        addTaskBtn.className = "full-width-btn";
+        addTaskBtn.textContent = "➕ 新增任務";
+        addTaskBtn.type = "button";
+        addTaskBtn.addEventListener("click", () => openTaskEditor(newTask(), rootTask.children, true));
+        taskRoot.appendChild(addTaskBtn);
     }
 }
 function renderTree(tasks, parentEl, path = [0]) {
@@ -1269,7 +1267,8 @@ function createTaskLine(task) {
 
     const ctr = document.createElement("span");
     ctr.className = "controls";
-    if (!isEditLocked) {
+
+    if (!isShowOneday && !isEditLocked) {
         const editBtn = document.createElement("button");
         editBtn.className = "edit-btn";
         editBtn.title = "編輯任務";
