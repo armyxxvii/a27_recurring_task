@@ -420,11 +420,10 @@ function buildIdMap(list) {
 function flattenTasks(data, parentIndexPath = [0], parentTitlePath = [], visible = true) {
     const list = [];
     data.forEach((task, i) => {
-        const indexPath = [...parentIndexPath, i];
+        const indexPath = !isShowOneday ? [...parentIndexPath, i] : null;
         const titlePath = [...parentTitlePath, task.title];
         if (visible) {
-            // 建立淺拷貝並帶上 origPath、fullTitle（不改變原始 task 物件）
-            list.push({ ...task, fullTitle: titlePath.join(" / "), origPath: indexPath });
+            list.push({ ...task, fullTitle: titlePath.join(" / ") });
         }
         const showChildren = !task.collapsed || isShowOneday;
         if (showChildren && task.children?.length) {
@@ -1115,30 +1114,32 @@ function renderTasks() {
     treeRoot.id = "task-tree-root";
     treeRoot.className = "outdent";
 
-    let needRenderCalendar = !isShowOneday;
-    if (isShowOneday) {
-        if (isShowTaskList) {
-            // 平面模式
-            const flatTasks = getOnedayFlatTasks();
-            const ul = document.createElement("ul");
-            ul.className = "task-tree";
-            flatTasks.forEach(task => {
-                const li = createTaskNode(task, task.origPath || [0]);
-                ul.appendChild(li);
-            });
-            treeRoot.appendChild(ul);
-        } else {
-            // 單日樹狀模式
-            renderTree(getShowTasks(), treeRoot);
-            needRenderCalendar = true;
-        }
+    let showCalendar;
+    let ul;
+    if (isShowTaskList) {
+        // 平面模式
+        const flatTasks = getOnedayFlatTasks();
+        ul = document.createElement("ul");
+        ul.className = "task-tree";
+        flatTasks.forEach(task => {
+            const li = createTaskNode(task);
+            ul.appendChild(li);
+        });
+        showCalendar = false;
     } else {
-        renderTree(rootTask.children, treeRoot);
-        needRenderCalendar = true;
+        if (isShowOneday) {
+            // 單日樹狀模式
+            ul = renderTree(getOnedayTreeTasks());
+            showCalendar = true;
+        } else {
+            ul = renderTree(rootTask.children);
+            showCalendar = true;
+        }
     }
+    treeRoot.appendChild(ul);
     scrollSyncDiv.appendChild(treeRoot);
 
-    if (needRenderCalendar) {
+    if (showCalendar) {
         treeRoot.classList.add("tree-column");
         scrollSyncDiv.classList.add("scroll-sync");
 
@@ -1155,7 +1156,7 @@ function renderTasks() {
 
     if (!isShowOneday && !isEditLocked) {
         treeRoot.addEventListener("click", onTaskNodeClick);
-        if (needRenderCalendar) {
+        if (showCalendar) {
             const calendarTable = document.getElementById("calendar-table");
             calendarTable.addEventListener("click", toggleComplete);
             const thead = calendarTable.querySelector("thead");
@@ -1169,17 +1170,18 @@ function renderTasks() {
         taskRoot.appendChild(addTaskBtn);
     }
 }
-function renderTree(tasks, parentEl, path = [0]) {
+function renderTree(tasks, path = [0]) {
     const ul = document.createElement("ul");
     ul.className = "task-tree";
 
     tasks.forEach((task, i) => {
-        const nodePath = [...path, i];
+        const nodePath = !isShowOneday ? [...path, i] : null;
         const li = createTaskNode(task, nodePath);
-        const needRenderChildren = isShowOneday || !task.collapsed;
 
+        const needRenderChildren = isShowOneday || !task.collapsed;
         if (task.children?.length > 0 && needRenderChildren) {
-            renderTree(task.children, li, nodePath);
+            const ul = renderTree(task.children, nodePath);
+            li.appendChild(ul);
         }
         ul.appendChild(li);
     });
@@ -1215,35 +1217,7 @@ function renderTree(tasks, parentEl, path = [0]) {
         }
     });
 
-    parentEl.appendChild(ul);
-}
-function renderOnedayTree(tasks, parentEl, path = [0]) {
-    const ul = document.createElement("ul");
-    ul.className = "task-tree";
-
-    function hasMatch(task) {
-        if (isTaskCompletedOnSelectedDate(task)) return true;
-        if (!Array.isArray(task.children) || task.children.length === 0) return false;
-        for (const c of task.children) {
-            if (hasMatch(c)) return true;
-        }
-        return false;
-    }
-
-    tasks.forEach((task, i) => {
-        if (!hasMatch(task)) return; // 此節點與子孫皆無符合，略過
-        const nodePath = [...path, i]; // 真正對應 rootTask 的數字索引路徑
-        const li = createTaskNode(task, nodePath);
-
-        // 只對符合條件的子節點遞迴（維持原始索引路徑）
-        if (Array.isArray(task.children) && task.children.length > 0) {
-            renderOnedayTree(task.children, li, nodePath);
-        }
-
-        ul.appendChild(li);
-    });
-
-    parentEl.appendChild(ul);
+    return ul;
 }
 function createTaskLine(task) {
     const line = document.createElement("div");
@@ -1283,7 +1257,7 @@ function createTaskLine(task) {
     line.append(toggleBtn, titleSpan, ctr);
     return line;
 }
-function createTaskNode(task, path) {
+function createTaskNode(task, path = null) {
     if (!task || typeof task !== "object") {
         console.error("Invalid task:", task);
         return document.createElement("li");
@@ -1291,7 +1265,8 @@ function createTaskNode(task, path) {
 
     const node = document.createElement("li");
     node.className = "task-node " + (task.collapsed ? "collapsed" : "expanded");
-    node.dataset.path = path.join(",");
+    if (path && !isShowOneday)
+        node.dataset.path = path.join(",");
     node.appendChild(createTaskLine(task));
 
     return node;
