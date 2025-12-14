@@ -2,10 +2,15 @@
 // 1. DOM nodes & global state
 // ===========================
 const titleUser = document.getElementById("title-user");
+const controls = document.getElementById("controls");
 const titleMonth = document.getElementById("title-month");
 const calendarStart = document.getElementById("calendar-start");
 const calendarEnd = document.getElementById("calendar-end");
 const calendarSelected = document.getElementById("selected-date");
+const dateRange = document.getElementById('date-range');
+const dateSelector = document.getElementById("date-selector");
+const datePrev = document.getElementById("prev-day");
+const dateNext = document.getElementById("next-day");
 const toast = document.getElementById("save-toast");
 const taskRoot = document.getElementById("task-root");
 const listRoot = document.getElementById("list-root");
@@ -52,8 +57,10 @@ let lists = [];
 let memos = [];
 let toggleSortableBtn;
 let isSortableEnabled = false;
+
 let showOnedayBtn;
-let isShowOneday = false;
+let isShowOneday = true;
+
 let toggleTaskListBtn;
 let isShowTaskList = false;
 
@@ -347,6 +354,12 @@ function generateDateStrings() {
         cursor.setDate(cursor.getDate() + 1);
     }
     return result;
+} 
+function changeSelectedDate(offset) {
+    const currentDate = parseDate(calendarSelected.value);
+    const newDate = new Date(currentDate.getTime() + offset * dayMs);
+    calendarSelected.value = formatDate(newDate);
+    refreshAll();
 }
 
 // ===========================
@@ -996,9 +1009,8 @@ function refreshToggleTaskListBtn() {
     toggleTaskListBtn.title = "今日任務清單";
 }
 function refreshDateInputVisible() {
-    calendarStart.classList.toggle("hidden", isShowOneday);
-    calendarEnd.classList.toggle("hidden", isShowOneday);
-    calendarSelected.classList.toggle("hidden", !isShowOneday);
+    dateRange.classList.toggle("hidden", isShowOneday);
+    dateSelector.classList.toggle("hidden", !isShowOneday);
 }
 function toggleShowOneday() {
     isShowOneday = !isShowOneday;
@@ -1036,7 +1048,6 @@ function toggleEditLock() {
 // 4b. Render
 // ===========================
 function renderControls() {
-    const controls = document.getElementById("controls");
     clearChildren(controls);
 
     toggleEditLockBtn = document.createElement("button");
@@ -1240,7 +1251,6 @@ function createTaskLine(task) {
     titleSpan.innerHTML = `<span class="day-counter">${task.intervalDays}</span> ${task.title}`;
 
     const ctr = document.createElement("span");
-    ctr.className = "controls";
 
     if (!isShowOneday && !isEditLocked) {
         const editBtn = document.createElement("button");
@@ -1457,7 +1467,6 @@ function createListTitle(list) {
 
     if (!isEditLocked) {
         const btnBar = document.createElement("span");
-        btnBar.className = "controls";
         const editBtn = document.createElement("button");
         editBtn.className = "edit-btn";
         editBtn.title = "編輯清單";
@@ -1511,3 +1520,5 @@ calendarStart.addEventListener("change", refreshAll);
 calendarEnd.addEventListener("change", refreshAll);
 calendarSelected.addEventListener("change", refreshAll);
 document.addEventListener("DOMContentLoaded", showLogin);
+datePrev.addEventListener("click", () => changeSelectedDate(-1));
+dateNext.addEventListener("click", () => changeSelectedDate(1));

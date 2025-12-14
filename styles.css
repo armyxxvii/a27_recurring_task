@@ -136,7 +136,7 @@ h6 {
     overflow-y: scroll;
 }
 
-#controls {
+.controls {
     display: flex;
     flex-grow: 1;
     gap: 0.3rem;

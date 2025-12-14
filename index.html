@@ -11,19 +11,29 @@
 </head>
 <body>
     <header class="title-bar">
-        <h1>任務樹×循環行事曆<sub>v25.12.02</sub></h1>
+        <h1>任務樹×循環行事曆<sub>v25.12.14</sub></h1>
         <div class="task-info">
             <span id="title-user"></span>
             <br />
             <span id="title-month"></span>
         </div>
-        <div id="controls" class="container"></div>
+        <div id="controls" class="container controls"></div>
     </header>
     <div class="content-area">
         <div class="container">
-            <input type="date" id="calendar-start" title="選擇開始日期" class="hidden">
-            <input type="date" id="calendar-end" title="選擇結束日期" class="hidden">
-            <input type="date" id="selected-date" title="選擇指定日期" class="hidden enabled">
+            <div id="date-range" class="controls">
+                <input type="date" id="calendar-start" title="選擇開始日期" class="hidden">
+                <input type="date" id="calendar-end" title="選擇結束日期" class="hidden">
+            </div>
+            <div id="date-selector" class="controls">
+                <button type="button" id="prev-day" title="前一天">
+                    <i class="fas fa-angle-left"></i>
+                </button>
+                <input type="date" id="selected-date" title="選擇指定日期" class="enabled">
+                <button type="button" id="next-day" title="後一天">
+                    <i class="fas fa-angle-right"></i>
+                </button>
+            </div>
         </div>
         <div id="task-root" class="container">
             <div class="scroll-sync">
