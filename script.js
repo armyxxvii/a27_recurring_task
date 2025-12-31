@@ -946,6 +946,7 @@ function createIcon(iconClass, parentElement) {
     parentElement.appendChild(icon);
 }
 function refreshToggleSortableBtn() {
+    toggleSortableBtn.classList.toggle("hidden", isShowOneday);
     toggleSortableBtn.classList.toggle("enabled", isSortableEnabled);
     toggleSortableBtn.title = isSortableEnabled ? "禁用排序" : "啟用排序";
 }
@@ -1063,17 +1064,17 @@ function renderControls() {
     toggleSortableBtn.onclick = toggleSortable;
     controls.appendChild(toggleSortableBtn);
 
-    showOnedayBtn = document.createElement("button");
-    showOnedayBtn.type = "button";
-    createIcon("fa-calendar-day", showOnedayBtn);
-    showOnedayBtn.onclick = toggleShowOneday;
-    controls.appendChild(showOnedayBtn);
-
     toggleTaskListBtn = document.createElement("button");
     toggleTaskListBtn.type = "button";
     createIcon("fa-list", toggleTaskListBtn);
     toggleTaskListBtn.onclick = toggleShowTasksList;
     controls.appendChild(toggleTaskListBtn);
+
+    showOnedayBtn = document.createElement("button");
+    showOnedayBtn.type = "button";
+    createIcon("fa-calendar-day", showOnedayBtn);
+    showOnedayBtn.onclick = toggleShowOneday;
+    controls.appendChild(showOnedayBtn);
 
     const undoBtn = document.createElement("button");
     undoBtn.title = "撤銷";
@@ -1127,25 +1128,25 @@ function renderTasks() {
 
     let showCalendar;
     let ul;
-    if (isShowTaskList) {
-        // 平面模式
-        const flatTasks = getOnedayFlatTasks();
-        ul = document.createElement("ul");
-        ul.className = "task-tree";
-        flatTasks.forEach(task => {
-            const li = createTaskNode(task);
-            ul.appendChild(li);
-        });
-        showCalendar = false;
-    } else {
-        if (isShowOneday) {
+    if (isShowOneday) {
+        if (isShowTaskList) {
+            // 平面模式
+            const flatTasks = getOnedayFlatTasks();
+            ul = document.createElement("ul");
+            ul.className = "task-tree";
+            flatTasks.forEach(task => {
+                const li = createTaskNode(task);
+                ul.appendChild(li);
+            });
+            showCalendar = false;
+        } else {
             // 單日樹狀模式
             ul = renderTree(getOnedayTreeTasks());
             showCalendar = true;
-        } else {
-            ul = renderTree(rootTask.children);
-            showCalendar = true;
         }
+    } else {
+        ul = renderTree(rootTask.children);
+        showCalendar = true;
     }
     treeRoot.appendChild(ul);
     scrollSyncDiv.appendChild(treeRoot);
