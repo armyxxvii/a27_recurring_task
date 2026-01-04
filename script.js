@@ -62,7 +62,7 @@ let showOnedayBtn;
 let isShowOneday = true;
 
 let toggleTaskListBtn;
-let isShowTaskList = false;
+let isShowTaskList = true;
 
 let toggleEditLockBtn;
 let isEditLocked = true;
@@ -433,7 +433,7 @@ function buildIdMap(list) {
 function flattenTasks(data, parentIndexPath = [0], parentTitlePath = [], visible = true) {
     const list = [];
     data.forEach((task, i) => {
-        const indexPath = !isShowOneday ? [...parentIndexPath, i] : null;
+        const indexPath = [...parentIndexPath, i];
         const titlePath = [...parentTitlePath, task.title];
         if (visible) {
             list.push({ ...task, fullTitle: titlePath.join(" / ") });
@@ -1248,8 +1248,9 @@ function createTaskLine(task) {
     }
 
     const titleSpan = document.createElement("span");
+    const title = isShowOneday && isShowTaskList ? task.fullTitle : task.title;
     titleSpan.className = "task-title";
-    titleSpan.innerHTML = `<span class="day-counter">${task.intervalDays}</span> ${task.title}`;
+    titleSpan.innerHTML = `<span class="day-counter">${task.intervalDays}</span> ${title}`;
 
     const ctr = document.createElement("span");
 
@@ -1395,6 +1396,7 @@ function createMemoLine(memo, index, colors) {
     line.append(textSpan);
 
     if (!isEditLocked) {
+        const btnBar = document.createElement("span");
         const editBtn = document.createElement("button");
         editBtn.className = "edit-btn";
         editBtn.title = "編輯備忘";
@@ -1405,7 +1407,8 @@ function createMemoLine(memo, index, colors) {
         deleteBtn.title = "刪除備忘";
         createIcon("fa-trash", deleteBtn);
         deleteBtn.onclick = () => deleteMemo(index);
-        line.append(editBtn, deleteBtn);
+        btnBar.append(editBtn, deleteBtn);
+        line.append(btnBar);
     }
     li.appendChild(line);
 
