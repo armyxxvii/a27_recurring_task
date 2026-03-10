@@ -23,7 +23,6 @@ const url = "https://script.google.com/macros/s/AKfycbyh1bOMMMIYLZF1o4A_q1UZpRzc
 const undoStack = [];
 const redoStack = [];
 const holidayDates = new Set();
-const farFuture = "2700-02-27";
 const dayMs = 1000 * 60 * 60 * 24;
 const today = parseDate(new Date());
 const todayStr = formatDate(today);
@@ -42,6 +41,7 @@ const colors = [
     "#dad",     // 藕色／溫和
     "#fb5",     // 橘茶／溫和
 ];
+const MAX_UNDO = 30;
 const KEYS = {
     LAST_USER: "lastUser",
     LAST_MONTH: "lastMonth"
@@ -258,8 +258,14 @@ function getCurrentState() {
     };
 }
 function saveState() {
-    undoStack.push(getCurrentState());
+    pushUndoSnapshot(getCurrentState());
     redoStack.length = 0;
+}
+function pushUndoSnapshot(snapshot) {
+    undoStack.push(snapshot);
+    if (undoStack.length > MAX_UNDO) {
+        undoStack.splice(0, undoStack.length - MAX_UNDO);
+    }
 }
 function undo() {
     if (undoStack.length === 0) {
