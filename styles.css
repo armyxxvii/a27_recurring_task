@@ -171,7 +171,7 @@ h6 {
 =========================== */
 .tree-column {
     flex-shrink: 0;
-    padding: 25px 0 0 0;
+    padding: 22px 0 0 0;
     border: none;
 }
 
@@ -193,8 +193,8 @@ ul.task-tree {
     padding: 0px 3px;
     border: 0.5px solid #ddd;
     border-radius: 6px 0 0 6px;
-    min-height: 25px;
-    line-height: 21px;
+    height: 20px;
+    line-height: 0px;
     display: flex;
     align-items: center;
     gap: 3px;
@@ -230,6 +230,16 @@ ul.task-tree {
         margin: 3px;
     }
 
+
+.memo-block {
+    padding: 0px 3px;
+    border: 0.5px solid #ddd;
+    border-radius: 6px;
+    line-height: 16px;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
 /* ===========================
    編輯視窗
 =========================== */
@@ -302,7 +312,7 @@ table {
         text-align: center;
         white-space: nowrap;
         min-width: 2.5rem;
-        height: 25px;
+        height: 20px;
         line-height: 0px;
         vertical-align: middle;
     }

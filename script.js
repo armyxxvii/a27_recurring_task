@@ -1389,11 +1389,11 @@ function renderMemos() {
 }
 function createMemoLine(memo, index, colors) {
     const li = document.createElement("li");
-    li.className = "task-node";
+    //li.className = "task-node";
     li.dataset.index = index;
 
     const line = document.createElement("div");
-    line.className = "task-line";
+    line.className = "memo-block";
     line.style.background = colors[memo.swatchId] || "transparent";
 
     const textSpan = document.createElement("span");
@@ -1454,7 +1454,7 @@ function renderLists() {
 }
 function createListLine(list, index, colors) {
     const li = document.createElement("li");
-    li.className = "task-node";
+    //li.className = "task-node";
     li.dataset.index = index;
 
     // 標題列
