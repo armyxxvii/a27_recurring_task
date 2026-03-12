@@ -1,5 +1,5 @@
 ﻿// ===========================
-// 1. DOM nodes & global state
+// DOM nodes & global state
 // ===========================
 const titleUser = document.getElementById("title-user");
 const controls = document.getElementById("controls");
@@ -13,6 +13,7 @@ const datePrev = document.getElementById("prev-day");
 const dateNext = document.getElementById("next-day");
 const toast = document.getElementById("save-toast");
 const taskRoot = document.getElementById("task-root");
+const ganttRoot = document.getElementById("gantt-root");
 const listRoot = document.getElementById("list-root");
 const listContainer = document.getElementById("list-container");
 const memoRoot = document.getElementById("memo-root");
@@ -46,9 +47,15 @@ const KEYS = {
     LAST_USER: "lastUser",
     LAST_MONTH: "lastMonth"
 };
-const idMap = new Map();
-const rootTask = {
-    title: "ROOT",
+const idMapRecr = new Map();
+const idMapGantt = new Map();
+const rootRecr = {
+    title: "RECR_ROOT",
+    path: [0],
+    children: []
+};
+const rootGantt = {
+    title: "GANTT_ROOT",
     path: [0],
     children: []
 };
@@ -70,11 +77,11 @@ let isEditLocked = true;
 let currentUser = null;
 let monthData = null;
 let currentMonth = null;
+let isScrollSyncing = false;
 
 // ===========================
-// 2a. Google Sheets I/O
+// Google Sheets I/O
 // ===========================
-// 讀取所有資料
 async function fetchDataFromGoogleSheet() {
     if (!currentUser || !currentMonth) {
         showToast("請先登入並選擇月份");
@@ -87,11 +94,22 @@ async function fetchDataFromGoogleSheet() {
             headers: { "Content-Type": "text/plain;charset=utf-8" }
         });
         const data = await res.json();
-        rootTask.children = Array.isArray(data.tasks) ? data.tasks : [];
-        lists = Array.isArray(data.lists) ? data.lists : [];
-        memos = Array.isArray(data.memos) ? data.memos : [];
-        holidayDates.clear();
-        (data.holidays || []).forEach(d => holidayDates.add(d));
+        if (data.tasks) {
+            rootRecr.children = Array.isArray(data.tasks) ? data.tasks : [];
+        }
+        if (data.ganttTasks) {
+            rootGantt.children = Array.isArray(data.ganttTasks) ? data.ganttTasks : [];
+        }
+        if (data.lists) {
+            lists = Array.isArray(data.lists) ? data.lists : [];
+        }
+        if (data.memos) {
+            memos = Array.isArray(data.memos) ? data.memos : [];
+        }
+        if (data.holidays) {
+            holidayDates.clear();
+            data.holidays.forEach(d => holidayDates.add(d));
+        }
         if (data.calendarRange) {
             calendarStart.value = data.calendarRange.start || "";
             calendarEnd.value = data.calendarRange.end || "";
@@ -108,7 +126,6 @@ async function fetchDataFromGoogleSheet() {
         hidePageDim();
     }
 }
-// 儲存所有資料
 async function saveDataToGoogleSheet() {
     if (!currentUser || !currentMonth) {
         showToast("請先登入並選擇月份");
@@ -170,14 +187,15 @@ function getCurrentData() {
             start: calendarStart.value ? calendarStart.value : null,
             end: calendarEnd.value ? calendarEnd.value : null
         },
-        tasks: rootTask.children,
+        tasks: rootRecr.children,
+        ganttTasks: rootGantt.children,
         memos,
         lists
     };
 }
 
 // ===========================
-// 2b. 產生下一個月資料
+// 產生下一個月資料
 // ===========================
 async function saveNextMonthData() {
     if (!currentUser || !currentMonth) {
@@ -197,7 +215,7 @@ function getNextData() {
     refreshAll();
 
     const nextMonthRange = generateNextMonthRange(today);
-    const clonedTasks = JSON.parse(JSON.stringify(rootTask.children));
+    const clonedTasks = JSON.parse(JSON.stringify(rootRecr.children));
     const cleanedTasks = cleanTasks(clonedTasks);
 
     return {
@@ -245,11 +263,12 @@ function generateNextMonthRange(today) {
 }
 
 // ===========================
-// 2c. 撤銷 / 重做
+// 撤銷 / 重做
 // ===========================
 function getCurrentState() {
     return {
-        tasks: JSON.parse(JSON.stringify(rootTask.children)),
+        tasks: JSON.parse(JSON.stringify(rootRecr.children)),
+        ganttTasks: JSON.parse(JSON.stringify(rootGantt.children)),
         lists: JSON.parse(JSON.stringify(lists)),
         memos: JSON.parse(JSON.stringify(memos)),
         holidayDates: new Set(holidayDates),
@@ -274,7 +293,8 @@ function undo() {
     }
     const previousState = undoStack.pop();
     redoStack.push(getCurrentState());
-    rootTask.children = previousState.tasks;
+    rootRecr.children = previousState.tasks;
+    rootGantt.children = previousState.ganttTasks || [];
     lists = previousState.lists;
     memos = previousState.memos;
     holidayDates.clear();
@@ -292,7 +312,8 @@ function redo() {
     }
     const nextState = redoStack.pop();
     undoStack.push(getCurrentState());
-    rootTask.children = nextState.tasks;
+    rootRecr.children = nextState.tasks;
+    rootGantt.children = nextState.ganttTasks || [];
     lists = nextState.lists;
     memos = nextState.memos;
     holidayDates.clear();
@@ -312,7 +333,7 @@ function execute(action) {
 }
 
 // ===========================
-// 3a. Date
+// Date
 // ===========================
 function formatDate(d) {
     const yy = d.getFullYear();
@@ -337,7 +358,7 @@ function sortDates() {
             if (task.children?.length) recurSort(task.children);
         });
     }
-    recurSort(rootTask.children);
+    recurSort(rootRecr.children);
 }
 function diffDays(task, prevCompDate, targetDate) {
     const target = parseDate(targetDate);
@@ -367,11 +388,21 @@ function changeSelectedDate(offset) {
     calendarSelected.value = formatDate(newDate);
     refreshAll();
 }
+function toggleHoliday(event) {
+    const th = event.target.closest("th[data-date]");
+    if (!th) return;
+    const ds = th?.dataset?.date;
+    if (!ds) return;
+    execute(() => {
+        if (holidayDates.has(ds)) holidayDates.delete(ds);
+        else holidayDates.add(ds);
+    });
+}
 
 // ===========================
-// 3b. Tasks & Calendar
+// Recurrence
 // ===========================
-function newTask() {
+function newRecr() {
     return {
         id: Date.now().toString(),
         title: "",
@@ -382,22 +413,23 @@ function newTask() {
         children: []
     };
 }
-function deleteTask(task) {
-    const path = findTaskPath(task);
+function deleteRecr(recr) {
+    const path = findRecrPath(recr);
     if (!path) return false;
     if (confirm("確定要刪除這個任務？")) {
         execute(() => {
-            const { parent, index } = getTaskByPath(path);
+            const { parent, index } = getRecrByPath(path);
             parent.children.splice(index, 1);
+            // do NOT modify rootGantt; calendar and gantt are independent
         });
         return true;
     }
     return false;
 }
-function copyTask(task) {
-    const path = findTaskPath(task);
+function copyRecr(recr) {
+    const path = findRecrPath(recr);
     if (!path) return false;
-    const { parent } = getTaskByPath(path);
+    const { parent } = getRecrByPath(path);
     function deepCopy(obj) {
         const newObj = { ...obj };
         newObj.id = Date.now().toString() + Math.random().toString(36).substring(2, 5);
@@ -410,52 +442,16 @@ function copyTask(task) {
         return newObj;
     }
     execute(() => {
-        const copied = deepCopy(task);
+        const copied = deepCopy(recr);
         parent.children.push(copied);
     });
     return true;
 }
-function isTaskCompletedOnSelectedDate(task) {
-    if (!Array.isArray(task.completionDates)) return false;
-
-    return task.completionDates.some(date => date === calendarSelected.value);
-}
-function buildIdMap(list) {
-    idMap.clear();
-    if (!Array.isArray(list)) return;
-    const stack = [...list];
-    while (stack.length) {
-        const task = stack.pop();
-        // 檢查 id 是否存在
-        if (task && typeof task.id !== "undefined") {
-            idMap.set(task.id, task);
-        }
-        // children 必須是陣列才展開
-        if (Array.isArray(task?.children) && task.children.length > 0) {
-            stack.push(...task.children);
-        }
-    }
-}
-function flattenTasks(data, parentIndexPath = [0], parentTitlePath = [], visible = true) {
-    const list = [];
-    data.forEach((task, i) => {
-        const indexPath = [...parentIndexPath, i];
-        const titlePath = [...parentTitlePath, task.title];
-        if (visible) {
-            list.push({ ...task, fullTitle: titlePath.join(" / ") });
-        }
-        const showChildren = !task.collapsed || isShowOneday;
-        if (showChildren && task.children?.length) {
-            list.push(...flattenTasks(task.children, indexPath, titlePath, showChildren));
-        }
-    });
-    return list;
-}
-function getTaskByPath(path) {
+function getRecrByPath(path) {
     const result = {
         parent: null,
         index: path[0],
-        task: rootTask,
+        task: rootRecr,
     };
 
     for (let i = 1; i < path.length; i++) {
@@ -464,54 +460,66 @@ function getTaskByPath(path) {
         result.task = result.parent.children[result.index];
     }
 
-    //console.log("Getting task by path:", path, "Result:", result); // 調試輸出
     return result;
 }
-function findTaskPath(target, data = rootTask, path = [0]) {
+function findRecrPath(target, data = rootRecr, path = [0]) {
     const child = data.children;
     for (let i = 0; i < child.length; i++) {
         const t = child[i];
         const currentPath = [...path, i];
         if (t === target) return currentPath;
         if (Array.isArray(t.children)) {
-            const childPath = findTaskPath(target, t, currentPath);
+            const childPath = findRecrPath(target, t, currentPath);
             if (childPath) return childPath;
         }
     }
     return null;
 }
-function onTaskNodeClick(event) {
+function isRecrCompletedOnSelectedDate(task) {
+    if (!Array.isArray(task.completionDates)) return false;
+
+    return task.completionDates.some(date => date === calendarSelected.value);
+}
+function buildRecrIdMap(list) {
+    idMapRecr.clear();
+    if (!Array.isArray(list)) return;
+    const stack = [...list];
+    while (stack.length) {
+        const task = stack.pop();
+        // 檢查 id 是否存在
+        if (task && typeof task.id !== "undefined") {
+            idMapRecr.set(task.id, task);
+        }
+        // children 必須是陣列才展開
+        if (Array.isArray(task?.children) && task.children.length > 0) {
+            stack.push(...task.children);
+        }
+    }
+}
+
+function onRecrNodeClick(event) {
     const li = event.target.closest(".task-node");
     if (!li) return;
     const path = li.dataset.path.split(",").map(Number);
-    const { task } = getTaskByPath(path);
+    const { task } = getRecrByPath(path);
 
     if (!Array.isArray(task.children)) task.children = [];
     if (event.target.matches(".toggle-btn")) {
         execute(() => { task.collapsed = !task.collapsed; });
     } else if (event.target.matches(".add-child-btn")) {
-        openTaskEditor(newTask(), task.children, true);
+        openRecrEditor(newRecr(), task.children, true);
     } else if (event.target.matches(".edit-btn")) {
-        openTaskEditor(task, null, false);
+        openRecrEditor(task, null, false);
     }
 }
-function toggleHoliday(event) {
-    const th = event.target.closest("th[data-date]");
-    if (!th) return;
-    const ds = th?.dataset?.date;
-    if (!ds) return;
-    execute(() => {
-        if (holidayDates.has(ds)) holidayDates.delete(ds);
-        else holidayDates.add(ds);
-    });
-}
-function toggleComplete(event) {
+function onRecrCalendarClick(event) {
     const td = event.target.closest("td[data-id]");
     if (!td) return;
     const { id, date } = td.dataset;
-    const found = idMap.get(id);
+    const found = idMapRecr.get(id);
     if (!found) return;
     execute(() => {
+        found.completionDates = found.completionDates || [];
         const i = found.completionDates.indexOf(date);
         if (i >= 0) found.completionDates.splice(i, 1);
         else found.completionDates.push(date);
@@ -519,8 +527,198 @@ function toggleComplete(event) {
     });
 }
 
+function getRecrOnedayTreeTasks() {
+    function dateFilter(tasks) {
+        const result = [];
+        for (const task of tasks) {
+            let filteredChildren = [];
+            if (Array.isArray(task.children) && task.children.length > 0) {
+                filteredChildren = dateFilter(task.children);
+            }
+
+            if (isRecrCompletedOnSelectedDate(task) || filteredChildren.length > 0) {
+                result.push({
+                    ...task,
+                    children: filteredChildren
+                });
+            }
+        }
+        return result;
+    }
+
+    return dateFilter(rootRecr.children);
+}
+function getRecrOnedayFlatTasks() {
+    return flattenTasks(rootRecr.children).filter(task => isRecrCompletedOnSelectedDate(task));
+}
+function getShowRecrs() {
+    if (!isShowOneday) return rootRecr.children;
+    if (isShowTaskList) return getRecrOnedayFlatTasks();
+    else return getRecrOnedayTreeTasks();
+}
+
 // ===========================
-// 3c. Memo & List
+// Gantt
+// ===========================
+function newGantt() {
+    return {
+        id: Date.now().toString(),
+        title: "",
+        swatchId: 0,
+        startDate: null,
+        endDate: null,
+        durationDays: 1,
+        collapsed: true,
+        children: []
+    };
+}
+function deleteGantt(gantt) {
+    const path = findGanttPath(gantt);
+    if (!path) return false;
+    if (confirm("確定要刪除這個甘特任務？")) {
+        execute(() => {
+            const { parent, index } = getGanttByPath(path);
+            parent.children.splice(index, 1);
+        });
+        return true;
+    }
+    return false;
+}
+function copyGantt(gantt) {
+    const path = findGanttPath(gantt);
+    if (!path) return false;
+    const { parent } = getGanttByPath(path);
+    function deepCopy(obj) {
+        const newObj = { ...obj };
+        newObj.id = Date.now().toString() + Math.random().toString(36).substring(2, 5);
+        if (Array.isArray(obj.children)) {
+            newObj.children = obj.children.map(child => deepCopy(child));
+        }
+        return newObj;
+    }
+    execute(() => {
+        const copied = deepCopy(gantt);
+        parent.children.push(copied);
+    });
+    return true;
+}
+function getGanttByPath(path) {
+    const result = {
+        parent: null,
+        index: path[0],
+        task: rootGantt,
+    };
+
+    for (let i = 1; i < path.length; i++) {
+        result.parent = result.task;
+        result.index = path[i];
+        result.task = result.parent.children[result.index];
+    }
+
+    return result;
+}
+function findGanttPath(target, data = rootGantt, path = [0]) {
+    const child = data.children;
+    for (let i = 0; i < child.length; i++) {
+        const t = child[i];
+        const currentPath = [...path, i];
+        if (t === target) return currentPath;
+        if (Array.isArray(t.children)) {
+            const childPath = findGanttPath(target, t, currentPath);
+            if (childPath) return childPath;
+        }
+    }
+    return null;
+}
+function isGanttCompletedOnSelectedDate(gantt) {
+    if (!gantt) return false;
+    if (!gantt.startDate && !gantt.endDate) return false;
+
+    const sel = parseDate(calendarSelected.value);
+    const start = gantt.startDate ? parseDate(gantt.startDate) : sel;
+    const end = gantt.endDate ? parseDate(gantt.endDate) : sel;
+    return sel >= start && sel <= end;
+}
+function buildGanttIdMap(list) {
+    idMapGantt.clear();
+    if (!Array.isArray(list)) return;
+    const stack = [...list];
+    while (stack.length) {
+        const task = stack.pop();
+        if (task && typeof task.id !== "undefined") {
+            idMapGantt.set(task.id, task);
+        }
+        if (Array.isArray(task?.children) && task.children.length > 0) {
+            stack.push(...task.children);
+        }
+    }
+}
+
+function onGanttNodeClick(event) {
+    const li = event.target.closest(".task-node");
+    if (!li) return;
+    const path = li.dataset.path.split(",").map(Number);
+    const { task } = getGanttByPath(path);
+
+    if (!Array.isArray(task.children)) task.children = [];
+    if (event.target.matches(".toggle-btn")) {
+        execute(() => { task.collapsed = !task.collapsed; });
+    } else if (event.target.matches(".add-child-btn")) {
+        openGanttEditor(newGantt(), task.children, true);
+    } else if (event.target.matches(".edit-btn")) {
+        openGanttEditor(task, null, false);
+    }
+}
+function onGanttCalendarClick(event) {
+    const td = event.target.closest("td[data-id]");
+    if (!td) return;
+    const { id, date } = td.dataset;
+    const found = idMapGantt.get(id);
+    if (!found) return;
+    execute(() => {
+        const d = date;
+        if (found.startDate && found.endDate && d >= found.startDate && d <= found.endDate) {
+            delete found.startDate;
+            delete found.endDate;
+        } else {
+            found.startDate = d;
+            found.endDate = d;
+        }
+    });
+}
+
+function getGanttOnedayTreeTasks() {
+    function dateFilter(tasks) {
+        const result = [];
+        for (const task of tasks) {
+            let filteredChildren = [];
+            if (Array.isArray(task.children) && task.children.length > 0) {
+                filteredChildren = dateFilter(task.children);
+            }
+
+            if (isGanttCompletedOnSelectedDate(task) || filteredChildren.length > 0) {
+                result.push({
+                    ...task,
+                    children: filteredChildren
+                });
+            }
+        }
+        return result;
+    }
+
+    return dateFilter(rootGantt.children);
+}
+function getGanttOnedayFlatTasks() {
+    return flattenTasks(rootGantt.children).filter(task => isGanttCompletedOnSelectedDate(task));
+}
+function getShowGantts() {
+    if (!isShowOneday) return rootGantt.children;
+    if (isShowTaskList) return getGanttOnedayFlatTasks();
+    else return getGanttOnedayTreeTasks();
+}
+
+// ===========================
+// Memo & List
 // ===========================
 function newMemo() {
     return {
@@ -564,23 +762,8 @@ function clearListDone(list) {
 }
 
 // ===========================
-// 3d. Window (Editor)
+// Window (Editor)
 // ===========================
-function createColorSwatches(selectedSwatchId, onpointerdown) {
-    const container = document.createElement("div");
-    container.className = "color-swatches";
-    colors.forEach((color, index) => {
-        const btn = document.createElement("button");
-        btn.className = "swatch" + (selectedSwatchId === index ? " selected" : "");
-        btn.style.background = color || "transparent";
-        btn.dataset.swatchId = index;
-        btn.title = color || "無";
-        btn.type = "button";
-        btn.onpointerdown = () => onpointerdown(btn, index);
-        container.appendChild(btn);
-    });
-    return container;
-}
 /**
 * 開啟編輯器視窗。
 * @param {Object} options - 編輯器選項。
@@ -680,11 +863,10 @@ function openEditor(options) {
     editor.appendChild(editorButtons);
     document.body.appendChild(editor);
 }
-
-function openTaskEditor(task, parentArray, isNew) {
+function openRecrEditor(task, parentArray, isNew) {
     openEditor({
         title: `${isNew ? "新增" : "編輯"}任務`,
-        fields: createTaskFields(task),
+        fields: createRecrFields(task),
         swatchId: task.swatchId,
         onSwatchChange: swatchId => task.swatchId = swatchId,
         onSave: editor => {
@@ -692,13 +874,14 @@ function openTaskEditor(task, parentArray, isNew) {
                 task.title = editor.querySelector("#edit-title").value.trim() || "（未命名）";
                 task.intervalDays = +editor.querySelector("#edit-interval").value || 0;
                 if (parentArray) parentArray.push(task);
+                // note: calendar and gantt tasks are independent; do not sync to rootGantt
             });
         },
-        onDelete: !isNew ? () => deleteTask(task) : null,
-        onCopy: !isNew ? () => copyTask(task) : null
+        onDelete: !isNew ? () => deleteRecr(task) : null,
+        onCopy: !isNew ? () => copyRecr(task) : null
     });
 }
-function createTaskFields(task) {
+function createRecrFields(task) {
     const labelTitle = document.createElement("label");
     labelTitle.textContent = "任務名稱：";
     const inputTitle = document.createElement("input");
@@ -716,6 +899,61 @@ function createTaskFields(task) {
     inputInterval.oninput = () => { task.intervalDays = +inputInterval.value; };
 
     return [labelTitle, inputTitle, labelInterval, inputInterval];
+}
+
+function openGanttEditor(task, parentArray, isNew) {
+    openEditor({
+        title: `${isNew ? "新增" : "編輯"}甘特任務`,
+        fields: createGanttFields(task),
+        swatchId: task.swatchId,
+        onSwatchChange: swatchId => task.swatchId = swatchId,
+        onSave: editor => {
+            execute(() => {
+                task.title = editor.querySelector("#edit-title").value.trim() || "（未命名）";
+                task.startDate = editor.querySelector("#edit-start").value || null;
+                task.endDate = editor.querySelector("#edit-end").value || null;
+                task.durationDays = +editor.querySelector("#edit-duration").value || 1;
+                if (parentArray) parentArray.push(task);
+            });
+        },
+        onDelete: !isNew ? () => deleteGantt(task) : null,
+        onCopy: !isNew ? () => copyGantt(task) : null
+    });
+}
+function createGanttFields(task) {
+    const labelTitle = document.createElement("label");
+    labelTitle.textContent = "任務名稱：";
+    const inputTitle = document.createElement("input");
+    inputTitle.type = "text";
+    inputTitle.id = "edit-title";
+    inputTitle.value = task.title || "";
+    inputTitle.oninput = () => { task.title = inputTitle.value; };
+
+    const labelStart = document.createElement("label");
+    labelStart.textContent = "開始日期：";
+    const inputStart = document.createElement("input");
+    inputStart.type = "date";
+    inputStart.id = "edit-start";
+    inputStart.value = task.startDate || "";
+    inputStart.oninput = () => { task.startDate = inputStart.value || null; };
+
+    const labelEnd = document.createElement("label");
+    labelEnd.textContent = "結束日期：";
+    const inputEnd = document.createElement("input");
+    inputEnd.type = "date";
+    inputEnd.id = "edit-end";
+    inputEnd.value = task.endDate || "";
+    inputEnd.oninput = () => { task.endDate = inputEnd.value || null; };
+
+    const labelDur = document.createElement("label");
+    labelDur.textContent = "持續天數：";
+    const inputDur = document.createElement("input");
+    inputDur.type = "number";
+    inputDur.id = "edit-duration";
+    inputDur.value = task.durationDays || 1;
+    inputDur.oninput = () => { task.durationDays = +inputDur.value || 1; };
+
+    return [labelTitle, inputTitle, labelStart, inputStart, labelEnd, inputEnd, labelDur, inputDur];
 }
 
 function openMemoEditor(memo, index, isNew) {
@@ -901,6 +1139,21 @@ async function showMonthSelection() {
     });
 }
 
+function createColorSwatches(selectedSwatchId, onpointerdown) {
+    const container = document.createElement("div");
+    container.className = "color-swatches";
+    colors.forEach((color, index) => {
+        const btn = document.createElement("button");
+        btn.className = "swatch" + (selectedSwatchId === index ? " selected" : "");
+        btn.style.background = color || "transparent";
+        btn.dataset.swatchId = index;
+        btn.title = color || "無";
+        btn.type = "button";
+        btn.onpointerdown = () => onpointerdown(btn, index);
+        container.appendChild(btn);
+    });
+    return container;
+}
 function showToast(msg = "已儲存") {
     toast.textContent = msg;
     toast.classList.add("show");
@@ -908,40 +1161,69 @@ function showToast(msg = "已儲存") {
 }
 
 function showPageDim() {
-    if (!document.getElementById("page-dim-overlay")) {
-        const overlay = document.createElement("div");
-        overlay.id = "page-dim-overlay";
-        overlay.className = "page-dim-overlay";
-        document.body.appendChild(overlay);
-    }
+    if (document.getElementById("page-dim-overlay")) return;
+
+    const overlay = document.createElement("div");
+    overlay.id = "page-dim-overlay";
+    overlay.className = "page-dim-overlay";
+    document.body.appendChild(overlay);
 }
 function hidePageDim() {
     document.getElementById("page-dim-overlay")?.remove();
 }
 
 // ===========================
-// 4a. Render utility
+// utility
 // ===========================
 function refreshAll() {
-    const scrollPositions = new Map();
-    document.querySelectorAll("[data-scrollable]").forEach(el => {
-        scrollPositions.set(el.id, el.scrollLeft);
-    });
-    buildIdMap(rootTask.children);
+    buildRecrIdMap(rootRecr.children);
+    buildGanttIdMap(rootGantt.children);
     renderControls();
-    renderTasks();
+    renderRecrs();
+    renderGantt();
     renderMemos();
     renderLists();
-    document.querySelectorAll("[data-scrollable]").forEach(el => {
-        if (scrollPositions.has(el.id)) el.scrollLeft = scrollPositions.get(el.id);
-    });
     const taskTitles = document.querySelectorAll(".task-title");
     taskTitles.forEach(title => {
         title.style.cursor = isSortableEnabled ? "move" : "default";
     });
+
+    attachScrollSyncToAll();
+}
+function attachScrollSyncToAll() {
+    const list = Array.from(document.querySelectorAll('[data-scrollable]'));
+    if (list.length === 0) return;
+
+    list.forEach(el => {
+        if (el.__hasScrollSync) return;
+        el.addEventListener('scroll', () => {
+            if (isScrollSyncing) return;
+            isScrollSyncing = true;
+            const left = el.scrollLeft;
+            list.forEach(o => { if (o !== el) o.scrollLeft = left; });
+            // release flag on next frame
+            window.requestAnimationFrame(() => { isScrollSyncing = false; });
+        });
+        el.__hasScrollSync = true;
+    });
 }
 function generateUniqueId() {
     return `list-${Math.random().toString(36).substring(2, 9)}`;
+}
+function flattenTasks(data, parentIndexPath = [0], parentTitlePath = [], visible = true) {
+    const list = [];
+    data.forEach((task, i) => {
+        const indexPath = [...parentIndexPath, i];
+        const titlePath = [...parentTitlePath, task.title];
+        if (visible) {
+            list.push({ ...task, fullTitle: titlePath.join(" / ") });
+        }
+        const showChildren = !task.collapsed || isShowOneday;
+        if (showChildren && task.children?.length) {
+            list.push(...flattenTasks(task.children, indexPath, titlePath, showChildren));
+        }
+    });
+    return list;
 }
 function clearChildren(parent) {
     while (parent.firstChild) parent.removeChild(parent.firstChild);
@@ -969,40 +1251,6 @@ function toggleSortable() {
         title.style.cursor = isSortableEnabled ? "move" : "default";
     });
     refreshToggleSortableBtn();
-}
-
-function getOnedayTreeTasks() {
-    function dateFilter(tasks) {
-        const result = [];
-        for (const task of tasks) {
-            let filteredChildren = [];
-            if (Array.isArray(task.children) && task.children.length > 0) {
-                filteredChildren = dateFilter(task.children);
-            }
-
-            if (isTaskCompletedOnSelectedDate(task) || filteredChildren.length > 0) {
-                result.push({
-                    ...task,
-                    children: filteredChildren
-                });
-            }
-        }
-        return result;
-    }
-
-    return dateFilter(rootTask.children);
-}
-function getOnedayFlatTasks() {
-    return flattenTasks(rootTask.children).filter(task => isTaskCompletedOnSelectedDate(task));
-}
-function getShowTasks() {
-    if (!isShowOneday)
-        return rootTask.children;
-
-    if (isShowTaskList)
-        return getOnedayFlatTasks();
-    else
-        return getOnedayTreeTasks();
 }
 
 function refreshShowOnedayBtn() {
@@ -1122,7 +1370,7 @@ function renderControls() {
     refreshDateInputVisible();
 }
 
-function renderTasks() {
+function renderRecrs() {
     clearChildren(taskRoot);
 
     const scrollSyncDiv = document.createElement("div");
@@ -1137,21 +1385,18 @@ function renderTasks() {
     if (isShowOneday) {
         if (isShowTaskList) {
             // 平面模式
-            const flatTasks = getOnedayFlatTasks();
+            const flatRecrs = getRecrOnedayFlatTasks();
             ul = document.createElement("ul");
             ul.className = "task-tree";
-            flatTasks.forEach(task => {
-                const li = createTaskNode(task);
-                ul.appendChild(li);
-            });
+            flatRecrs.forEach(rec => ul.appendChild(createRecrNode(rec)));
             showCalendar = false;
         } else {
             // 單日樹狀模式
-            ul = renderTree(getOnedayTreeTasks());
+            ul = renderTree(getRecrOnedayTreeTasks());
             showCalendar = true;
         }
     } else {
-        ul = renderTree(rootTask.children);
+        ul = renderTree(rootRecr.children);
         showCalendar = true;
     }
     treeRoot.appendChild(ul);
@@ -1161,31 +1406,31 @@ function renderTasks() {
         treeRoot.classList.add("tree-column");
         scrollSyncDiv.classList.add("scroll-sync");
 
-        const calendarColumn = document.createElement("div");
-        calendarColumn.id = "calendar-column";
-        calendarColumn.className = "calendar-column";
-        calendarColumn.setAttribute("data-scrollable", "");
+        const recrColumn = document.createElement("div");
+        recrColumn.id = "calendar-column";
+        recrColumn.className = "calendar-column";
+        recrColumn.setAttribute("data-scrollable", "");
 
-        const calendarTable = createCalendarTable();
-        calendarColumn.appendChild(calendarTable);
+        const recrTable = createRecrCalendar();
+        recrColumn.appendChild(recrTable);
 
-        scrollSyncDiv.appendChild(calendarColumn);
+        scrollSyncDiv.appendChild(recrColumn);
     }
 
     if (!isShowOneday && !isEditLocked) {
-        treeRoot.addEventListener("click", onTaskNodeClick);
+        treeRoot.addEventListener("click", onRecrNodeClick);
         if (showCalendar) {
-            const calendarTable = document.getElementById("calendar-table");
-            calendarTable.addEventListener("click", toggleComplete);
-            const thead = calendarTable.querySelector("thead");
+            const recrTable = document.getElementById("calendar-table");
+            recrTable.addEventListener("click", onRecrCalendarClick);
+            const thead = recrTable.querySelector("thead");
             thead.addEventListener("click", toggleHoliday);
         }
-        const addTaskBtn = document.createElement("button");
-        addTaskBtn.className = "full-width-btn";
-        addTaskBtn.textContent = "➕ 新增任務";
-        addTaskBtn.type = "button";
-        addTaskBtn.addEventListener("click", () => openTaskEditor(newTask(), rootTask.children, true));
-        taskRoot.appendChild(addTaskBtn);
+        const addRecrBtn = document.createElement("button");
+        addRecrBtn.className = "full-width-btn";
+        addRecrBtn.textContent = "➕ 新增循環任務";
+        addRecrBtn.type = "button";
+        addRecrBtn.addEventListener("click", () => openRecrEditor(newRecr(), rootRecr.children, true));
+        taskRoot.appendChild(addRecrBtn);
     }
 }
 function renderTree(tasks, path = [0]) {
@@ -1194,7 +1439,7 @@ function renderTree(tasks, path = [0]) {
 
     tasks.forEach((task, i) => {
         const nodePath = !isShowOneday ? [...path, i] : null;
-        const li = createTaskNode(task, nodePath);
+        const li = createRecrNode(task, nodePath);
 
         const needRenderChildren = isShowOneday || !task.collapsed;
         if (task.children?.length > 0 && needRenderChildren) {
@@ -1226,8 +1471,8 @@ function renderTree(tasks, path = [0]) {
             }
 
             execute(() => {
-                const { parent: fromParent, index: fromIdx, task: movedTask } = getTaskByPath(fromPath);
-                const { task: toParent } = getTaskByPath(toParentPath);
+                const { parent: fromParent, index: fromIdx, task: movedTask } = getRecrByPath(fromPath);
+                const { parent: toParent } = getRecrByPath(toParentPath);
 
                 fromParent.children.splice(fromIdx, 1);
                 toParent.children.splice(evt.newIndex, 0, movedTask);
@@ -1237,10 +1482,20 @@ function renderTree(tasks, path = [0]) {
 
     return ul;
 }
-function createTaskLine(task) {
-    const line = document.createElement("div");
-    line.className = "task-line";
-    line.style.background = colors[task.swatchId] || "transparent";
+function createRecrNode(task, path = null) {
+    if (!task || typeof task !== "object") {
+        console.error("Invalid task:", task);
+        return document.createElement("li");
+    }
+
+    const node = document.createElement("li");
+    node.className = "task-node " + (task.collapsed ? "collapsed" : "expanded");
+    if (path && !isShowOneday)
+        node.dataset.path = path.join(",");
+
+    const content = document.createElement("div");
+    content.className = "task-line";
+    content.style.background = colors[task.swatchId] || "transparent";
 
     const hasChildren = Array.isArray(task.children) && task.children.length > 0;
     const toggleBtn = document.createElement("button");
@@ -1272,30 +1527,16 @@ function createTaskLine(task) {
         ctr.append(editBtn, addChildBtn);
     }
 
-    line.append(toggleBtn, titleSpan, ctr);
-    return line;
-}
-function createTaskNode(task, path = null) {
-    if (!task || typeof task !== "object") {
-        console.error("Invalid task:", task);
-        return document.createElement("li");
-    }
-
-    const node = document.createElement("li");
-    node.className = "task-node " + (task.collapsed ? "collapsed" : "expanded");
-    if (path && !isShowOneday)
-        node.dataset.path = path.join(",");
-    node.appendChild(createTaskLine(task));
+    content.append(toggleBtn, titleSpan, ctr);
+    node.appendChild(content);
 
     return node;
 }
-function createCalendarTable() {
-    const calendarTable = document.createElement("table");
-    calendarTable.id = "calendar-table";
+function createRecrCalendar() {
+    const table = document.createElement("table");
+    table.id = "calendar-table";
     const thead = document.createElement("thead");
     const headerRow = document.createElement("tr");
-    headerRow.id = "date-header";
-
     const dateStrs = generateDateStrings();
     dateStrs.forEach(ds => {
         const th = document.createElement("th");
@@ -1309,32 +1550,36 @@ function createCalendarTable() {
     thead.appendChild(headerRow);
 
     const tbody = document.createElement("tbody");
-    tbody.id = "calendar-body";
-
-    const flatTasks = flattenTasks(getShowTasks());
-    flatTasks.forEach(task => {
-        const tr = createCalendarRow(task, dateStrs);
+    const tasks = flattenTasks(getShowRecrs());
+    tasks.forEach(task => {
+        const tr = createRecrCalendarRow(task, dateStrs);
         tbody.appendChild(tr);
     });
-    calendarTable.appendChild(thead);
-    calendarTable.appendChild(tbody);
-    return calendarTable;
+    table.appendChild(thead);
+    table.appendChild(tbody);
+    return table;
 }
-function createCalendarRow(task, dateRangeStr) {
-    const dateRange = (dateRangeStr || []).map(parseDate);
+function createRecrCalendarRow(task, dateStrs) {
+    const dateRange = (dateStrs || []).map(parseDate);
     const compDates = (task.completionDates || []).map(parseDate);
+    const compDateStrSet = new Set(task.completionDates || []);
     const tr = document.createElement("tr");
     tr.style.background = colors[task.swatchId] || "transparent";
 
-    dateRange.forEach(workDate => {
+    // iterate with cached parsed dates and reuse values
+    for (let i = 0; i < dateRange.length; i++) {
+        const workDate = dateRange[i];
+        const workTime = workDate.getTime();
         const workDateStr = formatDate(workDate);
+
         const td = document.createElement("td");
 
-        if (task.completionDates.some(str => str == workDateStr)) {
-            td.classList.add(workDate < today ? "done-past" : "done-future");
-            createIcon(workDate < today ? "fa-check" : "fa-paperclip", td);
+        if (compDateStrSet.has(workDateStr)) {
+            // exact completion on this date
+            td.classList.add(workTime < today.getTime() ? "done-past" : "done-future");
+            createIcon(workTime < today.getTime() ? "fa-check" : "fa-paperclip", td);
         } else {
-            const prevCompDate = compDates.find(date => date <= workDate) || null;
+            const prevCompDate = compDates.find(d => d.getTime() <= workTime) || null;
             if (prevCompDate) {
                 const diff = diffDays(task, prevCompDate, workDate);
                 td.classList.add(diff >= 0 ? "pending" : "overdue");
@@ -1351,7 +1596,141 @@ function createCalendarRow(task, dateRangeStr) {
         td.dataset.id = task.id;
         td.dataset.date = workDateStr;
         tr.appendChild(td);
+    }
+
+    return tr;
+}
+
+function renderGantt() {
+    clearChildren(ganttRoot);
+
+    const scrollSyncDiv = document.createElement("div");
+    ganttRoot.appendChild(scrollSyncDiv);
+
+    const treeRoot = document.createElement("div");
+    treeRoot.id = "gantt-tree-root";
+    treeRoot.className = "outdent";
+
+    let showCalendar;
+    let ul;
+    if (isShowOneday) {
+        if (isShowTaskList) {
+            // 平面模式
+            const flatTasks = getGanttOnedayFlatTasks();
+            ul = document.createElement("ul");
+            ul.className = "task-tree";
+            flatTasks.forEach(task => ul.appendChild(createGanttNode(task)));
+            showCalendar = false;
+        } else {
+            // 單日樹狀模式
+            ul = renderGanttTree(getGanttOnedayTreeTasks());
+            showCalendar = true;
+        }
+    } else {
+        ul = renderGanttTree(rootGantt.children);
+        showCalendar = true;
+    }
+
+    treeRoot.appendChild(ul);
+    scrollSyncDiv.appendChild(treeRoot);
+
+    if (showCalendar) {
+        treeRoot.classList.add("tree-column");
+        scrollSyncDiv.classList.add("scroll-sync");
+
+        const ganttColumn = document.createElement("div");
+        ganttColumn.id = "gantt-calendar-column";
+        ganttColumn.className = "calendar-column";
+        ganttColumn.setAttribute("data-scrollable", "");
+
+        const ganttTable = createGanttCalendar();
+        ganttColumn.appendChild(ganttTable);
+
+        scrollSyncDiv.appendChild(ganttColumn);
+    }
+
+    if (!isShowOneday && !isEditLocked) {
+        treeRoot.addEventListener("click", onGanttNodeClick);
+        if (showCalendar) {
+            const ganttTable = document.getElementById("gantt-calendar-table");
+            ganttTable.addEventListener("click", onGanttCalendarClick);
+            const thead = ganttTable.querySelector("thead");
+            thead.addEventListener("click", toggleHoliday);
+        }
+        const addGanttBtn = document.createElement("button");
+        addGanttBtn.className = "full-width-btn";
+        addGanttBtn.type = "button";
+        addGanttBtn.textContent = "➕ 新增單次任務";
+        addGanttBtn.addEventListener("click", () => openGanttEditor(newGantt(), rootGantt.children, true));
+        ganttRoot.appendChild(addGanttBtn);
+    }
+}
+function renderGanttTree(tasks, path = [0]) { return renderTree(tasks, path); }
+function createGanttNode(task, path = null) { return createRecrNode(task, path); }
+function createGanttCalendar() {
+    const table = document.createElement('table');
+    table.id = 'gantt-calendar-table';
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    const dateStrs = generateDateStrings();
+    dateStrs.forEach(ds => {
+        const th = document.createElement('th');
+        th.textContent = ds.slice(5);
+        th.dataset.date = ds;
+        th.title = "點擊設定 / 取消休假日";
+        if (holidayDates.has(ds)) th.classList.add('holiday');
+        if (ds === todayStr) th.classList.add('today');
+        headerRow.appendChild(th);
     });
+    thead.appendChild(headerRow);
+
+    const tbody = document.createElement('tbody');
+    const tasks = flattenTasks(getShowGantts());
+    tasks.forEach(task => {
+        tbody.appendChild(createGanttCalendarRow(task, dateStrs))
+    });
+    table.appendChild(thead);
+    table.appendChild(tbody);
+    return table;
+}
+function createGanttCalendarRow(task, dateStrs) {
+    const tr = document.createElement('tr');
+    tr.style.background = colors[task.swatchId] || 'transparent';
+
+    // Parse date strings once to avoid repeated parse work
+    const parsedDates = dateStrs.map(parseDate);
+
+    // Gantt tasks use startDate/endDate fields — use parsed Date objects or fall back to range bounds
+    const parsedStart = task.startDate ? parseDate(task.startDate) : parsedDates[0];
+    const parsedEnd = task.endDate ? parseDate(task.endDate) : parsedDates[parsedDates.length - 1];
+
+    // Compute done range end as timestamp
+    const duration = Math.max(1, task.durationDays || 1);
+    const doneEndTime = parsedStart.getTime() + (duration - 1) * dayMs;
+    const startTime = parsedStart.getTime();
+    const endTime = parsedEnd.getTime();
+
+    for (let i = 0; i < parsedDates.length; i++) {
+        const ds = dateStrs[i];
+        const dsDate = parsedDates[i];
+        const dsTime = dsDate.getTime();
+
+        const td = document.createElement('td');
+        td.dataset.date = ds;
+        td.dataset.id = task.id;
+
+        let markClass = null;
+        if (dsTime >= startTime) {
+            if (dsTime <= doneEndTime) {
+                markClass = dsTime > endTime ? 'done-future' : 'done-past';
+            } else if (dsTime <= endTime) {
+                markClass = 'overdue';
+            }
+        }
+
+        if (markClass) td.classList.add(markClass);
+        tr.appendChild(td);
+    }
 
     return tr;
 }
@@ -1454,7 +1833,7 @@ function renderLists() {
 }
 function createListLine(list, index, colors) {
     const li = document.createElement("li");
-    //li.className = "task-node";
+    li.className = "task-node";
     li.dataset.index = index;
 
     // 標題列
