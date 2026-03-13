@@ -77,7 +77,10 @@ let isEditLocked = true;
 let currentUser = null;
 let monthData = null;
 let currentMonth = null;
-let isScrollSyncing = false;
+
+let globalScrollLeft = 0;
+let _scrollSyncPending = { left: 0, source: null };
+let _scrollSyncRafId = null;
 
 // ===========================
 // Google Sheets I/O
@@ -381,7 +384,7 @@ function generateDateStrings() {
         cursor.setDate(cursor.getDate() + 1);
     }
     return result;
-} 
+}
 function changeSelectedDate(offset) {
     const currentDate = parseDate(calendarSelected.value);
     const newDate = new Date(currentDate.getTime() + offset * dayMs);
@@ -1159,23 +1162,42 @@ function refreshAll() {
         title.style.cursor = isSortableEnabled ? "move" : "default";
     });
 
-    attachScrollSyncToAll();
-}
-function attachScrollSyncToAll() {
     const list = Array.from(document.querySelectorAll('[data-scrollable]'));
-    if (list.length === 0) return;
+    list.forEach(el => { el.scrollLeft = globalScrollLeft; });
 
-    list.forEach(el => {
-        if (el.__hasScrollSync) return;
-        el.addEventListener('scroll', () => {
-            if (isScrollSyncing) return;
-            isScrollSyncing = true;
-            const left = el.scrollLeft;
-            list.forEach(o => { if (o !== el) o.scrollLeft = left; });
-            // release flag on next frame
-            window.requestAnimationFrame(() => { isScrollSyncing = false; });
-        });
-        el.__hasScrollSync = true;
+    for (const el of list) {
+        if (el.dataset.scrollSyncAttached) continue;
+        el.addEventListener('scroll', handleScrollEvent, { passive: true });
+        el.dataset.scrollSyncAttached = '1';
+    }
+}
+/**
+ * 統一處理捲動，同步所有帶 `data-scrollable` 元素的 scrollLeft。
+ * 使用 requestAnimationFrame 合併同幀內的多次事件以節流更新，減少 layout/paint 開銷。
+ * 僅記錄最新來源與位置並一次性寫回，降低記憶體與 CPU 負擔。
+ * 綁定時以 dataset.scrollSyncAttached 標記，避免重複綁定。
+ */
+function handleScrollEvent(e) {
+    const el = e.target;
+    // ignore events not from our scrollable elements
+    if (!el || !el.dataset || el.dataset.scrollSyncAttached !== '1') return;
+
+    const left = el.scrollLeft;
+    if (left === globalScrollLeft) return;
+
+    _scrollSyncPending.left = left;
+    _scrollSyncPending.source = el;
+
+    if (_scrollSyncRafId !== null) return;
+    _scrollSyncRafId = requestAnimationFrame(() => {
+        const pending = _scrollSyncPending.left;
+        globalScrollLeft = pending;
+        const list = Array.from(document.querySelectorAll('[data-scrollable]'));
+        for (const o of list) {
+            if (o !== _scrollSyncPending.source) o.scrollLeft = pending;
+        }
+        _scrollSyncPending.source = null;
+        _scrollSyncRafId = null;
     });
 }
 function generateUniqueId() {

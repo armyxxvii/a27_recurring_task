@@ -105,20 +105,7 @@ h6 {
     position: sticky;
     top: 0;
     z-index: 1000;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 0rem 0.3rem;
 }
-    .title-bar .task-info {
-        background: gold;
-        height: fit-content;
-        padding: 0.3rem;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-    }
 
     .title-bar sub,
     .title-bar sup,
@@ -126,26 +113,60 @@ h6 {
         font-size: 0.6rem;
     }
 
+.task-info {
+    background: gold;
+    height: fit-content;
+    padding: 0.1rem 0.3rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
 .content-area {
     overflow-y: scroll;
 }
 
 .controls {
+    margin-bottom: 0.3rem;
     display: flex;
-    flex-grow: 1;
     gap: 0.3rem;
     flex-wrap: nowrap;
-    justify-content: flex-end;
+    justify-content: center;
     align-items: center;
 }
+
     .controls button,
     .controls input {
+        padding: 0.1rem 0.4rem;
+        color: #fff;
+        background: #8b8b8b;
+        border: none;
+        cursor: pointer;
+        border-radius: 4px;
+        font-size: 16px;
         height: 1.7rem;
         padding: 0;
     }
+
     .controls button {
         width: 2.4rem;
     }
+
+        .controls button:hover,
+        .controls input:hover {
+            background: #666;
+        }
+
+        .controls button.enabled,
+        .controls input.enabled {
+            background: #a00;
+        }
+
+            .controls button.enabled:hover
+            .controls input.enabled:hover {
+                background: #f44336;
+                color: white;
+            }
 
 /* ===========================
    全寬度按鈕
@@ -250,7 +271,7 @@ ul.task-tree {
     left: 50%;
     transform: translate(-50%, -50%);
     background: #fff;
-    width: 90%;
+    width: 350px;
 }
 
     .editor label {

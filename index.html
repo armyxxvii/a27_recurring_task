@@ -11,17 +11,18 @@
 </head>
 <body>
     <header class="title-bar">
-        <h1>任務樹×循環行事曆<sub>v26.01.05</sub></h1>
-        <div class="task-info">
-            <sub id="title-user"></sub>
-            <sub id="title-month"></sub>
+        <div class="controls">
+            <h1>任務樹×循環行事曆<sub>v26.01.05</sub></h1>
+            <div class="task-info">
+                <small id="title-user"></small>
+                <small id="title-month"></small>
+            </div>
         </div>
-        <div id="controls" class="container controls"></div>
-        <div id="date-range" class="container controls hidden">
+        <div id="date-range" class="controls hidden">
             <input type="date" id="calendar-start" title="選擇開始日期">
             <input type="date" id="calendar-end" title="選擇結束日期">
         </div>
-        <div id="date-selector" class="container controls hidden">
+        <div id="date-selector" class="controls hidden">
             <input type="date" id="selected-date" title="選擇指定日期" class="enabled">
             <button type="button" id="prev-day" title="前一天">
                 <i class="fas fa-angle-left"></i>
@@ -30,6 +31,7 @@
                 <i class="fas fa-angle-right"></i>
             </button>
         </div>
+        <div id="controls" class="controls"></div>
     </header>
     <div class="content-area">
         <div id="task-root" class="container">
