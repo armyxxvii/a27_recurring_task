@@ -216,7 +216,7 @@ function getNextData() {
 
     const nextMonthRange = generateNextMonthRange(today);
     const clonedTasks = JSON.parse(JSON.stringify(rootRecr.children));
-    const cleanedTasks = cleanTasks(clonedTasks);
+    const cleanedTasks = cleanTask_R(clonedTasks);
 
     return {
         holidays: [],
@@ -226,13 +226,13 @@ function getNextData() {
         lists: JSON.parse(JSON.stringify(lists))
     };
 }
-function cleanTasks(tasks) {
+function cleanTask_R(tasks) {
     tasks.forEach(task => {
         if (Array.isArray(task.completionDates) && task.completionDates.length > 0) {
             task.completionDates = [task.completionDates[0]]; // 僅保留最新日期
         }
         if (Array.isArray(task.children)) {
-            cleanTasks(task.children); // 遞迴清理子任務
+            cleanTask_R(task.children); // 遞迴清理子任務
         }
     });
     return tasks;
@@ -350,15 +350,15 @@ function parseDate(input) {
     return new Date(input);
 }
 function sortDates() {
-    function recurSort(list) {
+    function sort_R(list) {
         list.forEach(task => {
             if (Array.isArray(task.completionDates)) {
                 task.completionDates.sort((a, b) => new Date(b) - new Date(a));
             }
-            if (task.children?.length) recurSort(task.children);
+            if (task.children?.length) sort_R(task.children);
         });
     }
-    recurSort(rootRecr.children);
+    sort_R(rootRecr.children);
 }
 function diffDays(task, prevCompDate, targetDate) {
     const target = parseDate(targetDate);
@@ -397,6 +397,23 @@ function toggleHoliday(event) {
         if (holidayDates.has(ds)) holidayDates.delete(ds);
         else holidayDates.add(ds);
     });
+}
+function filterTasksByDate_R(tasks, filter) {
+    const result = [];
+    for (const task of tasks) {
+        let filteredChildren = [];
+        if (Array.isArray(task.children) && task.children.length > 0) {
+            filteredChildren = filterTasksByDate_R(task.children, filter);
+        }
+
+        if (filter(task) || filteredChildren.length > 0) {
+            result.push({
+                ...task,
+                children: filteredChildren
+            });
+        }
+    }
+    return result;
 }
 
 // ===========================
@@ -475,11 +492,6 @@ function findRecrPath(target, data = rootRecr, path = [0]) {
     }
     return null;
 }
-function isRecrCompletedOnSelectedDate(task) {
-    if (!Array.isArray(task.completionDates)) return false;
-
-    return task.completionDates.some(date => date === calendarSelected.value);
-}
 function buildRecrIdMap(list) {
     idMapRecr.clear();
     if (!Array.isArray(list)) return;
@@ -527,34 +539,16 @@ function onRecrCalendarClick(event) {
     });
 }
 
-function getRecrOnedayTreeTasks() {
-    function dateFilter(tasks) {
-        const result = [];
-        for (const task of tasks) {
-            let filteredChildren = [];
-            if (Array.isArray(task.children) && task.children.length > 0) {
-                filteredChildren = dateFilter(task.children);
-            }
-
-            if (isRecrCompletedOnSelectedDate(task) || filteredChildren.length > 0) {
-                result.push({
-                    ...task,
-                    children: filteredChildren
-                });
-            }
-        }
-        return result;
-    }
-
-    return dateFilter(rootRecr.children);
-}
-function getRecrOnedayFlatTasks() {
-    return flattenTasks(rootRecr.children).filter(task => isRecrCompletedOnSelectedDate(task));
-}
 function getShowRecrs() {
+    function isRecrCompletedOnSelectedDate(task) {
+        if (!Array.isArray(task.completionDates)) return false;
+
+        return task.completionDates.some(date => date === calendarSelected.value);
+    }
     if (!isShowOneday) return rootRecr.children;
-    if (isShowTaskList) return getRecrOnedayFlatTasks();
-    else return getRecrOnedayTreeTasks();
+    const filtered = filterTasksByDate_R(rootRecr.children, isRecrCompletedOnSelectedDate);
+    if (!isShowTaskList) return filtered;
+    else return flattenTasks_R(filtered);
 }
 
 // ===========================
@@ -630,15 +624,6 @@ function findGanttPath(target, data = rootGantt, path = [0]) {
     }
     return null;
 }
-function isGanttCompletedOnSelectedDate(gantt) {
-    if (!gantt) return false;
-    if (!gantt.startDate && !gantt.endDate) return false;
-
-    const sel = parseDate(calendarSelected.value);
-    const start = gantt.startDate ? parseDate(gantt.startDate) : sel;
-    const end = gantt.endDate ? parseDate(gantt.endDate) : sel;
-    return sel >= start && sel <= end;
-}
 function buildGanttIdMap(list) {
     idMapGantt.clear();
     if (!Array.isArray(list)) return;
@@ -687,34 +672,20 @@ function onGanttCalendarClick(event) {
     });
 }
 
-function getGanttOnedayTreeTasks() {
-    function dateFilter(tasks) {
-        const result = [];
-        for (const task of tasks) {
-            let filteredChildren = [];
-            if (Array.isArray(task.children) && task.children.length > 0) {
-                filteredChildren = dateFilter(task.children);
-            }
-
-            if (isGanttCompletedOnSelectedDate(task) || filteredChildren.length > 0) {
-                result.push({
-                    ...task,
-                    children: filteredChildren
-                });
-            }
-        }
-        return result;
-    }
-
-    return dateFilter(rootGantt.children);
-}
-function getGanttOnedayFlatTasks() {
-    return flattenTasks(rootGantt.children).filter(task => isGanttCompletedOnSelectedDate(task));
-}
 function getShowGantts() {
+    function isGanttCompletedOnSelectedDate(gantt) {
+        if (!gantt) return false;
+        if (!gantt.startDate && !gantt.endDate) return false;
+
+        const sel = parseDate(calendarSelected.value);
+        const start = gantt.startDate ? parseDate(gantt.startDate) : sel;
+        const end = gantt.endDate ? parseDate(gantt.endDate) : sel;
+        return sel >= start && sel <= end;
+    }
     if (!isShowOneday) return rootGantt.children;
-    if (isShowTaskList) return getGanttOnedayFlatTasks();
-    else return getGanttOnedayTreeTasks();
+    const filtered = filterTasksByDate_R(rootGantt.children, isGanttCompletedOnSelectedDate);
+    if (!isShowTaskList) return filtered;
+    else return flattenTasks_R(filtered);
 }
 
 // ===========================
@@ -1210,7 +1181,7 @@ function attachScrollSyncToAll() {
 function generateUniqueId() {
     return `list-${Math.random().toString(36).substring(2, 9)}`;
 }
-function flattenTasks(data, parentIndexPath = [0], parentTitlePath = [], visible = true) {
+function flattenTasks_R(data, parentIndexPath = [0], parentTitlePath = [], visible = true) {
     const list = [];
     data.forEach((task, i) => {
         const indexPath = [...parentIndexPath, i];
@@ -1220,7 +1191,7 @@ function flattenTasks(data, parentIndexPath = [0], parentTitlePath = [], visible
         }
         const showChildren = !task.collapsed || isShowOneday;
         if (showChildren && task.children?.length) {
-            list.push(...flattenTasks(task.children, indexPath, titlePath, showChildren));
+            list.push(...flattenTasks_R(task.children, indexPath, titlePath, showChildren));
         }
     });
     return list;
@@ -1297,6 +1268,81 @@ function toggleEditLock() {
     isEditLocked = !isEditLocked;
     refreshEditLockBtn();
     refreshAll();
+}
+
+function renderTasks(tasks, nodeCreater, path = [0]) {
+    const ul = document.createElement("ul");
+    ul.className = "task-tree";
+
+    tasks.forEach((task, i) => {
+        const nodePath = !isShowOneday ? [...path, i] : null;
+        const li = nodeCreater(task, nodePath);
+
+        const needRenderChildren = isShowOneday ? !isShowTaskList : !task.collapsed;
+        if (task.children?.length > 0 && needRenderChildren) {
+            const ul = renderTasks(task.children, nodeCreater, nodePath);
+            li.appendChild(ul);
+        }
+        ul.appendChild(li);
+    });
+
+    ul.sortableInstance = new Sortable(ul, {
+        group: "nested",
+        animation: 150,
+        fallbackOnBody: true,
+        swapThreshold: 0.65,
+        handle: ".task-title",
+        disabled: !isSortableEnabled,
+        onEnd(evt) {
+            const fromPath = evt.item.dataset.path.split(",").map(Number);
+            const toParentPath = evt.to.parentElement.dataset.path
+                ? evt.to.parentElement.dataset.path.split(",").map(Number)
+                : [0];
+
+            if (
+                toParentPath.length >= fromPath.length &&
+                toParentPath.slice(0, fromPath.length).every((v, i) => v === fromPath[i])
+            ) {
+                showToast("無法將任務拖曳到自己的子孫節點");
+                return;
+            }
+
+            execute(() => {
+                const { parent: fromParent, index: fromIdx, task: movedTask } = getRecrByPath(fromPath);
+                const { parent: toParent } = getRecrByPath(toParentPath);
+
+                fromParent.children.splice(fromIdx, 1);
+                toParent.children.splice(evt.newIndex, 0, movedTask);
+            });
+        }
+    });
+
+    return ul;
+}
+function renderCalendar(tableId, tasks, rowCreator) {
+    const table = document.createElement('table');
+    table.id = tableId;
+
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    const dateStrs = generateDateStrings();
+    dateStrs.forEach(ds => {
+        const th = document.createElement('th');
+        th.textContent = ds.slice(5);
+        th.dataset.date = ds;
+        th.title = '點擊設定 / 取消休假日';
+        if (holidayDates.has(ds)) th.classList.add('holiday');
+        if (ds === todayStr) th.classList.add('today');
+        headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+
+    const tbody = document.createElement('tbody');
+    flattenTasks_R(tasks).forEach(task => tbody.appendChild(rowCreator(task, dateStrs)));
+
+    table.appendChild(thead);
+    table.appendChild(tbody);
+    return table;
 }
 
 // ===========================
@@ -1380,28 +1426,12 @@ function renderRecrs() {
     treeRoot.id = "task-tree-root";
     treeRoot.className = "outdent";
 
-    let showCalendar;
-    let ul;
-    if (isShowOneday) {
-        if (isShowTaskList) {
-            // 平面模式
-            const flatRecrs = getRecrOnedayFlatTasks();
-            ul = document.createElement("ul");
-            ul.className = "task-tree";
-            flatRecrs.forEach(rec => ul.appendChild(createRecrNode(rec)));
-            showCalendar = false;
-        } else {
-            // 單日樹狀模式
-            ul = renderTree(getRecrOnedayTreeTasks());
-            showCalendar = true;
-        }
-    } else {
-        ul = renderTree(rootRecr.children);
-        showCalendar = true;
-    }
+    const tasksToShow = getShowRecrs();
+    let ul = renderTasks(tasksToShow, createRecrTask);
     treeRoot.appendChild(ul);
     scrollSyncDiv.appendChild(treeRoot);
 
+    let showCalendar = !(isShowOneday && isShowTaskList);
     if (showCalendar) {
         treeRoot.classList.add("tree-column");
         scrollSyncDiv.classList.add("scroll-sync");
@@ -1411,20 +1441,20 @@ function renderRecrs() {
         recrColumn.className = "calendar-column";
         recrColumn.setAttribute("data-scrollable", "");
 
-        const recrTable = createRecrCalendar();
+        const recrTable = renderCalendar('recr-calendar-table', tasksToShow, createRecrCalendarRow);
         recrColumn.appendChild(recrTable);
 
         scrollSyncDiv.appendChild(recrColumn);
-    }
-
-    if (!isShowOneday && !isEditLocked) {
-        treeRoot.addEventListener("click", onRecrNodeClick);
-        if (showCalendar) {
-            const recrTable = document.getElementById("calendar-table");
+        if (!isShowOneday && !isEditLocked) {
+            const recrTable = document.getElementById("recr-calendar-table");
             recrTable.addEventListener("click", onRecrCalendarClick);
             const thead = recrTable.querySelector("thead");
             thead.addEventListener("click", toggleHoliday);
         }
+    }
+
+    if (!isShowOneday && !isEditLocked) {
+        treeRoot.addEventListener("click", onRecrNodeClick);
         const addRecrBtn = document.createElement("button");
         addRecrBtn.className = "full-width-btn";
         addRecrBtn.textContent = "➕ 新增循環任務";
@@ -1433,56 +1463,7 @@ function renderRecrs() {
         taskRoot.appendChild(addRecrBtn);
     }
 }
-function renderTree(tasks, path = [0]) {
-    const ul = document.createElement("ul");
-    ul.className = "task-tree";
-
-    tasks.forEach((task, i) => {
-        const nodePath = !isShowOneday ? [...path, i] : null;
-        const li = createRecrNode(task, nodePath);
-
-        const needRenderChildren = isShowOneday || !task.collapsed;
-        if (task.children?.length > 0 && needRenderChildren) {
-            const ul = renderTree(task.children, nodePath);
-            li.appendChild(ul);
-        }
-        ul.appendChild(li);
-    });
-
-    ul.sortableInstance = new Sortable(ul, {
-        group: "nested",
-        animation: 150,
-        fallbackOnBody: true,
-        swapThreshold: 0.65,
-        handle: ".task-title",
-        disabled: !isSortableEnabled,
-        onEnd(evt) {
-            const fromPath = evt.item.dataset.path.split(",").map(Number);
-            const toParentPath = evt.to.parentElement.dataset.path
-                ? evt.to.parentElement.dataset.path.split(",").map(Number)
-                : [0];
-
-            if (
-                toParentPath.length >= fromPath.length &&
-                toParentPath.slice(0, fromPath.length).every((v, i) => v === fromPath[i])
-            ) {
-                showToast("無法將任務拖曳到自己的子孫節點");
-                return;
-            }
-
-            execute(() => {
-                const { parent: fromParent, index: fromIdx, task: movedTask } = getRecrByPath(fromPath);
-                const { parent: toParent } = getRecrByPath(toParentPath);
-
-                fromParent.children.splice(fromIdx, 1);
-                toParent.children.splice(evt.newIndex, 0, movedTask);
-            });
-        }
-    });
-
-    return ul;
-}
-function createRecrNode(task, path = null) {
+function createRecrTask(task, path = null) {
     if (!task || typeof task !== "object") {
         console.error("Invalid task:", task);
         return document.createElement("li");
@@ -1525,39 +1506,14 @@ function createRecrNode(task, path = null) {
         addChildBtn.title = "新增子任務";
         createIcon("fa-baby", addChildBtn);
         ctr.append(editBtn, addChildBtn);
+        content.append(toggleBtn, titleSpan, ctr);
     }
-
-    content.append(toggleBtn, titleSpan, ctr);
+    else {
+        content.append(titleSpan, ctr);
+    }
     node.appendChild(content);
 
     return node;
-}
-function createRecrCalendar() {
-    const table = document.createElement("table");
-    table.id = "calendar-table";
-    const thead = document.createElement("thead");
-    const headerRow = document.createElement("tr");
-    const dateStrs = generateDateStrings();
-    dateStrs.forEach(ds => {
-        const th = document.createElement("th");
-        th.textContent = ds.slice(5);
-        th.dataset.date = ds;
-        th.title = "點擊設定 / 取消休假日";
-        if (holidayDates.has(ds)) th.classList.add("holiday");
-        if (ds === todayStr) th.classList.add("today");
-        headerRow.appendChild(th);
-    });
-    thead.appendChild(headerRow);
-
-    const tbody = document.createElement("tbody");
-    const tasks = flattenTasks(getShowRecrs());
-    tasks.forEach(task => {
-        const tr = createRecrCalendarRow(task, dateStrs);
-        tbody.appendChild(tr);
-    });
-    table.appendChild(thead);
-    table.appendChild(tbody);
-    return table;
 }
 function createRecrCalendarRow(task, dateStrs) {
     const dateRange = (dateStrs || []).map(parseDate);
@@ -1611,29 +1567,12 @@ function renderGantt() {
     treeRoot.id = "gantt-tree-root";
     treeRoot.className = "outdent";
 
-    let showCalendar;
-    let ul;
-    if (isShowOneday) {
-        if (isShowTaskList) {
-            // 平面模式
-            const flatTasks = getGanttOnedayFlatTasks();
-            ul = document.createElement("ul");
-            ul.className = "task-tree";
-            flatTasks.forEach(task => ul.appendChild(createGanttNode(task)));
-            showCalendar = false;
-        } else {
-            // 單日樹狀模式
-            ul = renderGanttTree(getGanttOnedayTreeTasks());
-            showCalendar = true;
-        }
-    } else {
-        ul = renderGanttTree(rootGantt.children);
-        showCalendar = true;
-    }
-
+    const tasksToShow = getShowGantts();
+    let ul = renderTasks(tasksToShow, createGanttTask);
     treeRoot.appendChild(ul);
     scrollSyncDiv.appendChild(treeRoot);
 
+    let showCalendar = !(isShowOneday && isShowTaskList);
     if (showCalendar) {
         treeRoot.classList.add("tree-column");
         scrollSyncDiv.classList.add("scroll-sync");
@@ -1643,20 +1582,20 @@ function renderGantt() {
         ganttColumn.className = "calendar-column";
         ganttColumn.setAttribute("data-scrollable", "");
 
-        const ganttTable = createGanttCalendar();
+        const ganttTable = renderCalendar('gantt-calendar-table', tasksToShow, createGanttCalendarRow);
         ganttColumn.appendChild(ganttTable);
 
         scrollSyncDiv.appendChild(ganttColumn);
-    }
-
-    if (!isShowOneday && !isEditLocked) {
-        treeRoot.addEventListener("click", onGanttNodeClick);
-        if (showCalendar) {
+        if (!isShowOneday && !isEditLocked) {
             const ganttTable = document.getElementById("gantt-calendar-table");
             ganttTable.addEventListener("click", onGanttCalendarClick);
             const thead = ganttTable.querySelector("thead");
             thead.addEventListener("click", toggleHoliday);
         }
+    }
+
+    if (!isShowOneday && !isEditLocked) {
+        treeRoot.addEventListener("click", onGanttNodeClick);
         const addGanttBtn = document.createElement("button");
         addGanttBtn.className = "full-width-btn";
         addGanttBtn.type = "button";
@@ -1665,33 +1604,57 @@ function renderGantt() {
         ganttRoot.appendChild(addGanttBtn);
     }
 }
-function renderGanttTree(tasks, path = [0]) { return renderTree(tasks, path); }
-function createGanttNode(task, path = null) { return createRecrNode(task, path); }
-function createGanttCalendar() {
-    const table = document.createElement('table');
-    table.id = 'gantt-calendar-table';
-    const thead = document.createElement('thead');
-    const headerRow = document.createElement('tr');
-    const dateStrs = generateDateStrings();
-    dateStrs.forEach(ds => {
-        const th = document.createElement('th');
-        th.textContent = ds.slice(5);
-        th.dataset.date = ds;
-        th.title = "點擊設定 / 取消休假日";
-        if (holidayDates.has(ds)) th.classList.add('holiday');
-        if (ds === todayStr) th.classList.add('today');
-        headerRow.appendChild(th);
-    });
-    thead.appendChild(headerRow);
+function createGanttTask(task, path = null) {
+    if (!task || typeof task !== "object") {
+        console.error("Invalid task:", task);
+        return document.createElement("li");
+    }
 
-    const tbody = document.createElement('tbody');
-    const tasks = flattenTasks(getShowGantts());
-    tasks.forEach(task => {
-        tbody.appendChild(createGanttCalendarRow(task, dateStrs))
-    });
-    table.appendChild(thead);
-    table.appendChild(tbody);
-    return table;
+    const node = document.createElement("li");
+    node.className = "task-node " + (task.collapsed ? "collapsed" : "expanded");
+    if (path && !isShowOneday)
+        node.dataset.path = path.join(",");
+
+    const content = document.createElement("div");
+    content.className = "task-line";
+    content.style.background = colors[task.swatchId] || "transparent";
+
+    const hasChildren = Array.isArray(task.children) && task.children.length > 0;
+    const toggleBtn = document.createElement("button");
+    toggleBtn.className = "toggle-btn";
+    if (hasChildren) {
+        createIcon(task.collapsed ? "fa-chevron-right" : "fa-chevron-down", toggleBtn);
+    } else {
+        createIcon("fa-minus", toggleBtn);
+        toggleBtn.disabled = true;
+        task.collapsed = true;
+    }
+
+    const titleSpan = document.createElement("span");
+    const title = isShowOneday && isShowTaskList ? task.fullTitle : task.title;
+    titleSpan.className = "task-title";
+    titleSpan.innerHTML = title;
+
+    const ctr = document.createElement("span");
+
+    if (!isShowOneday && !isEditLocked) {
+        const editBtn = document.createElement("button");
+        editBtn.className = "edit-btn";
+        editBtn.title = "編輯任務";
+        createIcon("fa-pencil", editBtn);
+        const addChildBtn = document.createElement("button");
+        addChildBtn.className = "add-child-btn";
+        addChildBtn.title = "新增子任務";
+        createIcon("fa-baby", addChildBtn);
+        ctr.append(editBtn, addChildBtn);
+        content.append(toggleBtn, titleSpan, ctr);
+    }
+    else {
+        content.append(titleSpan, ctr);
+    }
+    node.appendChild(content);
+
+    return node;
 }
 function createGanttCalendarRow(task, dateStrs) {
     const tr = document.createElement('tr');
@@ -1806,7 +1769,7 @@ function renderLists() {
     ul.id = "list-container";
     ul.className = "outdent task-tree";
     lists.forEach((list, index) => {
-        const li = createListLine(list, index, colors);
+        const li = createListLine(list, index);
         ul.appendChild(li);
     });
     ul.sortableInstance = new Sortable(ul, {
@@ -1831,7 +1794,7 @@ function renderLists() {
         listRoot.appendChild(addBtn);
     }
 }
-function createListLine(list, index, colors) {
+function createListLine(list, index) {
     const li = document.createElement("li");
     li.className = "task-node";
     li.dataset.index = index;

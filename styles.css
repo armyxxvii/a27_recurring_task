@@ -193,8 +193,8 @@ ul.task-tree {
     padding: 0px 3px;
     border: 0.5px solid #ddd;
     border-radius: 6px 0 0 6px;
-    height: 20px;
-    line-height: 0px;
+    height: 1.2rem;
+    line-height: 0.8rem;
     display: flex;
     align-items: center;
     gap: 3px;
@@ -206,11 +206,11 @@ ul.task-tree {
         text-align: center;
         display: inline-block;
         height: 1rem;
+        line-height: 0.8rem;
         width: 1rem;
         font-size: 0.7rem;
         border: 1px solid #444;
         border-radius: 0.2rem;
-        line-height: 1rem;
     }
 
 .task-node {
@@ -312,8 +312,8 @@ table {
         text-align: center;
         white-space: nowrap;
         min-width: 2.5rem;
-        height: 20px;
-        line-height: 0px;
+        height: 1.2rem;
+        line-height: 0.8rem;
         vertical-align: middle;
     }
 
