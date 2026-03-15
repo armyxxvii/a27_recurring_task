@@ -843,6 +843,21 @@ function openEditor(options) {
     editor.appendChild(editorButtons);
     document.body.appendChild(editor);
 }
+function createColorSwatches(selectedSwatchId, onpointerdown) {
+    const container = document.createElement("div");
+    container.className = "color-swatches";
+    colors.forEach((color, index) => {
+        const btn = document.createElement("button");
+        btn.className = "swatch" + (selectedSwatchId === index ? " selected" : "");
+        btn.style.background = color || "transparent";
+        btn.dataset.swatchId = index;
+        btn.title = color || "無";
+        btn.type = "button";
+        btn.onpointerdown = () => onpointerdown(btn, index);
+        container.appendChild(btn);
+    });
+    return container;
+}
 function openRecrEditor(task, parentArray, isNew) {
     openEditor({
         title: `${isNew ? "新增" : "編輯"}任務`,
@@ -916,23 +931,23 @@ function createGanttFields(task) {
     inputStart.value = task.startDate || "";
     inputStart.oninput = () => { task.startDate = inputStart.value || null; };
 
-    const labelEnd = document.createElement("label");
-    labelEnd.textContent = "結束日期：";
-    const inputEnd = document.createElement("input");
-    inputEnd.type = "date";
-    inputEnd.id = "edit-end";
-    inputEnd.value = task.endDate || "";
-    inputEnd.oninput = () => { task.endDate = inputEnd.value || null; };
-
     const labelDur = document.createElement("label");
-    labelDur.textContent = "持續天數：";
+    labelDur.textContent = "預估天數：";
     const inputDur = document.createElement("input");
     inputDur.type = "number";
     inputDur.id = "edit-duration";
     inputDur.value = task.durationDays || 1;
     inputDur.oninput = () => { task.durationDays = +inputDur.value || 1; };
 
-    return [labelTitle, inputTitle, labelStart, inputStart, labelEnd, inputEnd, labelDur, inputDur];
+    const labelEnd = document.createElement("label");
+    labelEnd.textContent = "實際完成日期：";
+    const inputEnd = document.createElement("input");
+    inputEnd.type = "date";
+    inputEnd.id = "edit-end";
+    inputEnd.value = task.endDate || "";
+    inputEnd.oninput = () => { task.endDate = inputEnd.value || null; };
+
+    return [labelTitle, inputTitle, labelStart, inputStart, labelDur, inputDur, labelEnd, inputEnd];
 }
 
 function openMemoEditor(memo, index, isNew) {
@@ -1118,21 +1133,6 @@ async function showMonthSelection() {
     });
 }
 
-function createColorSwatches(selectedSwatchId, onpointerdown) {
-    const container = document.createElement("div");
-    container.className = "color-swatches";
-    colors.forEach((color, index) => {
-        const btn = document.createElement("button");
-        btn.className = "swatch" + (selectedSwatchId === index ? " selected" : "");
-        btn.style.background = color || "transparent";
-        btn.dataset.swatchId = index;
-        btn.title = color || "無";
-        btn.type = "button";
-        btn.onpointerdown = () => onpointerdown(btn, index);
-        container.appendChild(btn);
-    });
-    return container;
-}
 function showToast(msg = "已儲存") {
     toast.textContent = msg;
     toast.classList.add("show");
