@@ -117,6 +117,7 @@ async function fetchDataFromGoogleSheet() {
             calendarStart.value = data.calendarRange.start || "";
             calendarEnd.value = data.calendarRange.end || "";
         }
+        calendarSelected.value = todayStr;
         refreshAll();
         document.body.classList.remove("unsaved");
         titleUser.innerText = currentUser;
@@ -418,6 +419,10 @@ function filterTasksByDate_R(tasks, filter) {
     }
     return result;
 }
+function filterFlattenTasksByDate(tasks, filter) {
+    if (!Array.isArray(tasks)) return [];
+    return tasks.filter(filter);
+}
 
 // ===========================
 // Recurrence
@@ -543,15 +548,17 @@ function onRecrCalendarClick(event) {
 }
 
 function getShowRecrs() {
-    function isRecrCompletedOnSelectedDate(task) {
+    function filter(task) {
         if (!Array.isArray(task.completionDates)) return false;
 
         return task.completionDates.some(date => date === calendarSelected.value);
     }
     if (!isShowOneday) return rootRecr.children;
-    const filtered = filterTasksByDate_R(rootRecr.children, isRecrCompletedOnSelectedDate);
-    if (!isShowTaskList) return filtered;
-    else return flattenTasks_R(filtered);
+    if (isShowTaskList) {
+        const flattened = flattenTasks_R(rootRecr.children);
+        return filterFlattenTasksByDate(flattened, filter);
+    }
+    else return filterTasksByDate_R(rootRecr.children, filter);
 }
 
 // ===========================
@@ -664,31 +671,30 @@ function onGanttCalendarClick(event) {
     const found = idMapGantt.get(id);
     if (!found) return;
     execute(() => {
-        const d = date;
-        if (found.startDate && found.endDate && d >= found.startDate && d <= found.endDate) {
-            delete found.startDate;
-            delete found.endDate;
-        } else {
-            found.startDate = d;
-            found.endDate = d;
-        }
+        found.endDate = date;
     });
 }
 
 function getShowGantts() {
-    function isGanttCompletedOnSelectedDate(gantt) {
-        if (!gantt) return false;
-        if (!gantt.startDate && !gantt.endDate) return false;
+    function filter(task) {
+        if (!task) return false;
 
-        const sel = parseDate(calendarSelected.value);
-        const start = gantt.startDate ? parseDate(gantt.startDate) : sel;
-        const end = gantt.endDate ? parseDate(gantt.endDate) : sel;
-        return sel >= start && sel <= end;
+        const sel = parseDate(calendarSelected.value)
+        const selTime = (sel ? sel : today).getTime();
+        const startTime = task.startDate ? parseDate(task.startDate).getTime() : selTime;
+        const endTime = task.endDate ? parseDate(task.endDate).getTime() : selTime;
+        const dur = Math.max(1, task.durationDays || 1);
+        const estimatedEndTime = new Date(startTime + (dur - 1) * dayMs).getTime();
+        const lastTime = Math.max(endTime, estimatedEndTime);
+        const visible = selTime >= startTime && selTime <= lastTime;
+        return visible;
     }
     if (!isShowOneday) return rootGantt.children;
-    const filtered = filterTasksByDate_R(rootGantt.children, isGanttCompletedOnSelectedDate);
-    if (!isShowTaskList) return filtered;
-    else return flattenTasks_R(filtered);
+    if (isShowTaskList) {
+        const flattened = flattenTasks_R(rootGantt.children);
+        return filterFlattenTasksByDate(flattened, filter);
+    }
+    else return filterTasksByDate_R(rootGantt.children, filter);
 }
 
 // ===========================
@@ -848,7 +854,6 @@ function openRecrEditor(task, parentArray, isNew) {
                 task.title = editor.querySelector("#edit-title").value.trim() || "（未命名）";
                 task.intervalDays = +editor.querySelector("#edit-interval").value || 0;
                 if (parentArray) parentArray.push(task);
-                // note: calendar and gantt tasks are independent; do not sync to rootGantt
             });
         },
         onDelete: !isNew ? () => deleteRecr(task) : null,
@@ -885,8 +890,8 @@ function openGanttEditor(task, parentArray, isNew) {
             execute(() => {
                 task.title = editor.querySelector("#edit-title").value.trim() || "（未命名）";
                 task.startDate = editor.querySelector("#edit-start").value || null;
-                task.endDate = editor.querySelector("#edit-end").value || null;
                 task.durationDays = +editor.querySelector("#edit-duration").value || 1;
+                task.endDate = editor.querySelector("#edit-end").value || null;
                 if (parentArray) parentArray.push(task);
             });
         },
@@ -1358,12 +1363,12 @@ function renderCalendar(tableId, tasks, rowCreator) {
         headerRow.appendChild(th);
     });
     thead.appendChild(headerRow);
+    table.appendChild(thead);
 
     const tbody = document.createElement('tbody');
     flattenTasks_R(tasks).forEach(task => tbody.appendChild(rowCreator(task, dateStrs)));
-
-    table.appendChild(thead);
     table.appendChild(tbody);
+
     return table;
 }
 
@@ -1686,35 +1691,37 @@ function createGanttCalendarRow(task, dateStrs) {
     const parsedDates = dateStrs.map(parseDate);
 
     // Gantt tasks use startDate/endDate fields — use parsed Date objects or fall back to range bounds
-    const parsedStart = task.startDate ? parseDate(task.startDate) : parsedDates[0];
-    const parsedEnd = task.endDate ? parseDate(task.endDate) : parsedDates[parsedDates.length - 1];
+    const startDate = task.startDate ? parseDate(task.startDate) : parsedDates[0];
+    const startTime = startDate.getTime();
 
-    // Compute done range end as timestamp
     const duration = Math.max(1, task.durationDays || 1);
-    const doneEndTime = parsedStart.getTime() + (duration - 1) * dayMs;
-    const startTime = parsedStart.getTime();
-    const endTime = parsedEnd.getTime();
+    const estimatedEnd = new Date(startTime + (duration - 1) * dayMs);
+    const estimatedEndTime = estimatedEnd.getTime();
+
+    const endDate = task.endDate ? parseDate(task.endDate) : null;
+    const endTime = endDate ? endDate.getTime() : null;
 
     for (let i = 0; i < parsedDates.length; i++) {
         const ds = dateStrs[i];
         const dsDate = parsedDates[i];
-        const dsTime = dsDate.getTime();
+        const D = dsDate.getTime();
 
         const td = document.createElement('td');
         td.dataset.date = ds;
         td.dataset.id = task.id;
+        tr.appendChild(td);
 
         let markClass = null;
-        if (dsTime >= startTime) {
-            if (dsTime <= doneEndTime) {
-                markClass = dsTime > endTime ? 'done-future' : 'done-past';
-            } else if (dsTime <= endTime) {
-                markClass = 'overdue';
-            }
-        }
+        if (D < startTime) continue;
+        if (D > estimatedEndTime && D > endTime) continue;
+        if (endTime === null) continue;
 
+        if (D <= endTime) {
+            markClass = D <= estimatedEndTime ? 'done-past' : 'done-future';
+        } else if (D <= estimatedEndTime) {
+            markClass = 'overdue';
+        }
         if (markClass) td.classList.add(markClass);
-        tr.appendChild(td);
     }
 
     return tr;
