@@ -1297,7 +1297,7 @@ function toggleEditLock() {
     refreshAll();
 }
 
-function renderTasks(tasks, nodeCreater, path = [0]) {
+function renderTasks_R(tasks, nodeCreater, nodeGetter, path = [0]) {
     const ul = document.createElement("ul");
     ul.className = "task-tree";
 
@@ -1307,7 +1307,7 @@ function renderTasks(tasks, nodeCreater, path = [0]) {
 
         const needRenderChildren = isShowOneday ? !isShowTaskList : !task.collapsed;
         if (task.children?.length > 0 && needRenderChildren) {
-            const ul = renderTasks(task.children, nodeCreater, nodePath);
+            const ul = renderTasks_R(task.children, nodeCreater, nodeGetter, nodePath);
             li.appendChild(ul);
         }
         ul.appendChild(li);
@@ -1335,8 +1335,8 @@ function renderTasks(tasks, nodeCreater, path = [0]) {
             }
 
             execute(() => {
-                const { parent: fromParent, index: fromIdx, task: movedTask } = getRecrByPath(fromPath);
-                const { parent: toParent } = getRecrByPath(toParentPath);
+                const { parent: fromParent, index: fromIdx, task: movedTask } = nodeGetter(fromPath);
+                const { task: toParent } = nodeGetter(toParentPath);
 
                 fromParent.children.splice(fromIdx, 1);
                 toParent.children.splice(evt.newIndex, 0, movedTask);
@@ -1454,7 +1454,7 @@ function renderRecrs() {
     treeRoot.className = "outdent";
 
     const tasksToShow = getShowRecrs();
-    let ul = renderTasks(tasksToShow, createRecrTask);
+    let ul = renderTasks_R(tasksToShow, createRecrTask, getRecrByPath);
     treeRoot.appendChild(ul);
     scrollSyncDiv.appendChild(treeRoot);
 
@@ -1595,7 +1595,7 @@ function renderGantt() {
     treeRoot.className = "outdent";
 
     const tasksToShow = getShowGantts();
-    let ul = renderTasks(tasksToShow, createGanttTask);
+    let ul = renderTasks_R(tasksToShow, createGanttTask, getGanttByPath);
     treeRoot.appendChild(ul);
     scrollSyncDiv.appendChild(treeRoot);
 
