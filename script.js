@@ -438,23 +438,26 @@ function newRecr() {
         children: []
     };
 }
-function deleteRecr(recr) {
-    const path = findRecrPath(recr);
-    if (!path) return false;
+function deleteRecr(node) {
+    if (!node || !node.id) return false;
+    const entry = idMapRecr.get(node.id);
+    if (!entry || !entry.path) return false;
+    const path = entry.path;
     if (confirm("確定要刪除這個任務？")) {
         execute(() => {
-            const { parent, index } = getRecrByPath(path);
+            const { parent, index } = findTask(path, rootRecr);
             parent.children.splice(index, 1);
-            // do NOT modify rootGantt; calendar and gantt are independent
         });
         return true;
     }
     return false;
 }
-function copyRecr(recr) {
-    const path = findRecrPath(recr);
-    if (!path) return false;
-    const { parent } = getRecrByPath(path);
+function copyRecr(node) {
+    if (!node || !node.id) return false;
+    const entry = idMapRecr.get(node.id);
+    if (!entry || !entry.path) return false;
+    const path = entry.path;
+    const { parent } = findTask(path, rootRecr);
     function deepCopy(obj) {
         const newObj = { ...obj };
         newObj.id = Date.now().toString() + Math.random().toString(36).substring(2, 5);
@@ -467,52 +470,26 @@ function copyRecr(recr) {
         return newObj;
     }
     execute(() => {
-        const copied = deepCopy(recr);
+        const copied = deepCopy(node);
         parent.children.push(copied);
     });
     return true;
 }
-function getRecrByPath(path) {
-    const result = {
-        parent: null,
-        index: path[0],
-        task: rootRecr,
-    };
-
-    for (let i = 1; i < path.length; i++) {
-        result.parent = result.task;
-        result.index = path[i];
-        result.task = result.parent.children[result.index];
-    }
-
-    return result;
-}
-function findRecrPath(target, data = rootRecr, path = [0]) {
-    const child = data.children;
-    for (let i = 0; i < child.length; i++) {
-        const t = child[i];
-        const currentPath = [...path, i];
-        if (t === target) return currentPath;
-        if (Array.isArray(t.children)) {
-            const childPath = findRecrPath(target, t, currentPath);
-            if (childPath) return childPath;
-        }
-    }
-    return null;
-}
 function buildRecrIdMap(list) {
     idMapRecr.clear();
     if (!Array.isArray(list)) return;
-    const stack = [...list];
+    // use stack with path tracking; root tasks have path [0, idx]
+    const stack = list.map((task, i) => ({ task, path: [0, i] }));
     while (stack.length) {
-        const task = stack.pop();
-        // 檢查 id 是否存在
+        const { task, path } = stack.pop();
         if (task && typeof task.id !== "undefined") {
-            idMapRecr.set(task.id, task);
+            // store task and its path in the id map (do not mutate task)
+            idMapRecr.set(task.id, { task, path });
         }
-        // children 必須是陣列才展開
         if (Array.isArray(task?.children) && task.children.length > 0) {
-            stack.push(...task.children);
+            for (let i = 0; i < task.children.length; i++) {
+                stack.push({ task: task.children[i], path: [...path, i] });
+            }
         }
     }
 }
@@ -521,7 +498,7 @@ function onRecrNodeClick(event) {
     const li = event.target.closest(".task-node");
     if (!li) return;
     const path = li.dataset.path.split(",").map(Number);
-    const { task } = getRecrByPath(path);
+    const { task } = findTask(path, rootRecr);
 
     if (!Array.isArray(task.children)) task.children = [];
     if (event.target.matches(".toggle-btn")) {
@@ -536,8 +513,9 @@ function onRecrCalendarClick(event) {
     const td = event.target.closest("td[data-id]");
     if (!td) return;
     const { id, date } = td.dataset;
-    const found = idMapRecr.get(id);
-    if (!found) return;
+    const entry = idMapRecr.get(id);
+    if (!entry || !entry.task) return;
+    const found = entry.task;
     execute(() => {
         found.completionDates = found.completionDates || [];
         const i = found.completionDates.indexOf(date);
@@ -577,11 +555,13 @@ function newGantt() {
     };
 }
 function deleteGantt(gantt) {
-    const path = findGanttPath(gantt);
-    if (!path) return false;
+    if (!gantt || !gantt.id) return false;
+    const entry = idMapGantt.get(gantt.id);
+    if (!entry || !entry.path) return false;
+    const path = entry.path;
     if (confirm("確定要刪除這個甘特任務？")) {
         execute(() => {
-            const { parent, index } = getGanttByPath(path);
+            const { parent, index } = findTask(path, rootGantt);
             parent.children.splice(index, 1);
         });
         return true;
@@ -589,9 +569,11 @@ function deleteGantt(gantt) {
     return false;
 }
 function copyGantt(gantt) {
-    const path = findGanttPath(gantt);
-    if (!path) return false;
-    const { parent } = getGanttByPath(path);
+    if (!gantt || !gantt.id) return false;
+    const entry = idMapGantt.get(gantt.id);
+    if (!entry || !entry.path) return false;
+    const path = entry.path;
+    const { parent } = findTask(path, rootGantt);
     function deepCopy(obj) {
         const newObj = { ...obj };
         newObj.id = Date.now().toString() + Math.random().toString(36).substring(2, 5);
@@ -606,45 +588,19 @@ function copyGantt(gantt) {
     });
     return true;
 }
-function getGanttByPath(path) {
-    const result = {
-        parent: null,
-        index: path[0],
-        task: rootGantt,
-    };
-
-    for (let i = 1; i < path.length; i++) {
-        result.parent = result.task;
-        result.index = path[i];
-        result.task = result.parent.children[result.index];
-    }
-
-    return result;
-}
-function findGanttPath(target, data = rootGantt, path = [0]) {
-    const child = data.children;
-    for (let i = 0; i < child.length; i++) {
-        const t = child[i];
-        const currentPath = [...path, i];
-        if (t === target) return currentPath;
-        if (Array.isArray(t.children)) {
-            const childPath = findGanttPath(target, t, currentPath);
-            if (childPath) return childPath;
-        }
-    }
-    return null;
-}
 function buildGanttIdMap(list) {
     idMapGantt.clear();
     if (!Array.isArray(list)) return;
-    const stack = [...list];
+    const stack = list.map((task, i) => ({ task, path: [0, i] }));
     while (stack.length) {
-        const task = stack.pop();
+        const { task, path } = stack.pop();
         if (task && typeof task.id !== "undefined") {
-            idMapGantt.set(task.id, task);
+            idMapGantt.set(task.id, { task, path });
         }
         if (Array.isArray(task?.children) && task.children.length > 0) {
-            stack.push(...task.children);
+            for (let i = 0; i < task.children.length; i++) {
+                stack.push({ task: task.children[i], path: [...path, i] });
+            }
         }
     }
 }
@@ -653,7 +609,7 @@ function onGanttNodeClick(event) {
     const li = event.target.closest(".task-node");
     if (!li) return;
     const path = li.dataset.path.split(",").map(Number);
-    const { task } = getGanttByPath(path);
+    const { task } = findTask(path, rootGantt);
 
     if (!Array.isArray(task.children)) task.children = [];
     if (event.target.matches(".toggle-btn")) {
@@ -668,8 +624,9 @@ function onGanttCalendarClick(event) {
     const td = event.target.closest("td[data-id]");
     if (!td) return;
     const { id, date } = td.dataset;
-    const found = idMapGantt.get(id);
-    if (!found) return;
+    const entry = idMapGantt.get(id);
+    if (!entry || !entry.task) return;
+    const found = entry.task;
     execute(() => {
         found.endDate = date;
     });
@@ -1251,6 +1208,26 @@ function toggleSortable() {
     refreshToggleSortableBtn();
 }
 
+function findTask(path, root) {
+    if (!Array.isArray(path) || path.length === 0) return null;
+    if (!root || typeof root !== "object") return null;
+
+    let parent = null;
+    let node = root;
+    let index = path[0];
+
+    for (let i = 1; i < path.length; i++) {
+        parent = node;
+        if (!parent || !Array.isArray(parent.children)) return null;
+        index = path[i];
+        if (index < 0 || index >= parent.children.length) return null;
+        node = parent.children[index];
+        if (typeof node === "undefined" || node === null) return null;
+    }
+
+    return { parent, index, task: node };
+}
+
 function refreshShowOnedayBtn() {
     showOnedayBtn.classList.toggle("enabled", isShowOneday);
     showOnedayBtn.title = isShowOneday ? "顯示全部任務" : "只顯示今日有排程的任務";
@@ -1454,7 +1431,7 @@ function renderRecrs() {
     treeRoot.className = "outdent";
 
     const tasksToShow = getShowRecrs();
-    let ul = renderTasks_R(tasksToShow, createRecrTask, getRecrByPath);
+    let ul = renderTasks_R(tasksToShow, createRecrTask, path => findTask(path, rootRecr));
     treeRoot.appendChild(ul);
     scrollSyncDiv.appendChild(treeRoot);
 
@@ -1595,7 +1572,7 @@ function renderGantt() {
     treeRoot.className = "outdent";
 
     const tasksToShow = getShowGantts();
-    let ul = renderTasks_R(tasksToShow, createGanttTask, getGanttByPath);
+    let ul = renderTasks_R(tasksToShow, createGanttTask, path => findTask(path, rootGantt));
     treeRoot.appendChild(ul);
     scrollSyncDiv.appendChild(treeRoot);
 
