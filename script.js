@@ -815,6 +815,7 @@ function createColorSwatches(selectedSwatchId, onpointerdown) {
     });
     return container;
 }
+
 function openRecrEditor(task, parentArray, isNew) {
     openEditor({
         title: `${isNew ? "新增" : "編輯"}任務`,
@@ -846,7 +847,7 @@ function createRecrFields(task) {
     const inputInterval = document.createElement("input");
     inputInterval.type = "number";
     inputInterval.id = "edit-interval";
-    inputInterval.value = task.intervalDays || 7;
+    inputInterval.value = task.intervalDays != null ? task.intervalDays : 0;
     inputInterval.oninput = () => { task.intervalDays = +inputInterval.value; };
 
     return [labelTitle, inputTitle, labelInterval, inputInterval];
