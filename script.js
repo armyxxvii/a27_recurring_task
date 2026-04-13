@@ -527,10 +527,18 @@ function onRecrCalendarClick(event) {
 
 function getShowRecrs() {
     function filter(task) {
-        if (!Array.isArray(task.completionDates)) return false;
+        if (!Array.isArray(task.completionDates) || task.completionDates.length === 0) return false;
 
-        return task.completionDates.some(date => date === calendarSelected.value);
+        if (task.completionDates.some(date => date === calendarSelected.value)) return true;
+
+        // 使用 diffDays 判斷是否為過期（diff < 0 表示過期）
+        const latest = task.completionDates[0];
+        if (!latest || !calendarSelected.value) return false;
+
+        const d = diffDays(task, latest, calendarSelected.value);
+        return Number.isFinite(d) && d < 0;
     }
+
     if (!isShowOneday) return rootRecr.children;
     if (isShowTaskList) {
         const flattened = flattenTasks_R(rootRecr.children);
