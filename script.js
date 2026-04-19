@@ -1444,13 +1444,13 @@ function renderRecrs() {
     treeRoot.appendChild(ul);
     scrollSyncDiv.appendChild(treeRoot);
 
-    let showCalendar = !(isShowOneday && isShowTaskList);
-    if (showCalendar) {
+    let isShowCalendar = !(isShowOneday && isShowTaskList);
+    if (isShowCalendar) {
         treeRoot.classList.add("tree-column");
         scrollSyncDiv.classList.add("scroll-sync");
 
         const recrColumn = document.createElement("div");
-        recrColumn.id = "calendar-column";
+        recrColumn.id = "recr-calendar-column";
         recrColumn.className = "calendar-column";
         recrColumn.setAttribute("data-scrollable", "");
 
@@ -1458,8 +1458,8 @@ function renderRecrs() {
         recrColumn.appendChild(recrTable);
 
         scrollSyncDiv.appendChild(recrColumn);
-        if (!isShowOneday && !isEditLocked) {
-            const recrTable = document.getElementById("recr-calendar-table");
+
+        if (!isEditLocked) {
             recrTable.addEventListener("click", onRecrCalendarClick);
             const thead = recrTable.querySelector("thead");
             thead.addEventListener("click", toggleHoliday);
@@ -1585,8 +1585,8 @@ function renderGantt() {
     treeRoot.appendChild(ul);
     scrollSyncDiv.appendChild(treeRoot);
 
-    let showCalendar = !(isShowOneday && isShowTaskList);
-    if (showCalendar) {
+    let isShowCalendar = !(isShowOneday && isShowTaskList);
+    if (isShowCalendar) {
         treeRoot.classList.add("tree-column");
         scrollSyncDiv.classList.add("scroll-sync");
 
@@ -1599,8 +1599,8 @@ function renderGantt() {
         ganttColumn.appendChild(ganttTable);
 
         scrollSyncDiv.appendChild(ganttColumn);
-        if (!isShowOneday && !isEditLocked) {
-            const ganttTable = document.getElementById("gantt-calendar-table");
+
+        if (!isEditLocked) {
             ganttTable.addEventListener("click", onGanttCalendarClick);
             const thead = ganttTable.querySelector("thead");
             thead.addEventListener("click", toggleHoliday);
@@ -1611,8 +1611,8 @@ function renderGantt() {
         treeRoot.addEventListener("click", onGanttNodeClick);
         const addGanttBtn = document.createElement("button");
         addGanttBtn.className = "full-width-btn";
-        addGanttBtn.type = "button";
         addGanttBtn.textContent = "➕ 新增單次任務";
+        addGanttBtn.type = "button";
         addGanttBtn.addEventListener("click", () => openGanttEditor(newGantt(), rootGantt.children, true));
         ganttRoot.appendChild(addGanttBtn);
     }
