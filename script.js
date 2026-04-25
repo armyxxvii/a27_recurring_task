@@ -78,9 +78,7 @@ let currentUser = null;
 let monthData = null;
 let currentMonth = null;
 
-let globalScrollLeft = 0;
-let _scrollSyncPending = { left: 0, source: null };
-let _scrollSyncRafId = null;
+let scrollCache = { recr: 0, gantt: 0 };
 
 // ===========================
 // Google Sheets I/O
@@ -1132,44 +1130,6 @@ function refreshAll() {
     taskTitles.forEach(title => {
         title.style.cursor = isSortableEnabled ? "move" : "default";
     });
-
-    const list = Array.from(document.querySelectorAll('[data-scrollable]'));
-    list.forEach(el => { el.scrollLeft = globalScrollLeft; });
-
-    for (const el of list) {
-        if (el.dataset.scrollSyncAttached) continue;
-        el.addEventListener('scroll', handleScrollEvent, { passive: true });
-        el.dataset.scrollSyncAttached = '1';
-    }
-}
-/**
- * 統一處理捲動，同步所有帶 `data-scrollable` 元素的 scrollLeft。
- * 使用 requestAnimationFrame 合併同幀內的多次事件以節流更新，減少 layout/paint 開銷。
- * 僅記錄最新來源與位置並一次性寫回，降低記憶體與 CPU 負擔。
- * 綁定時以 dataset.scrollSyncAttached 標記，避免重複綁定。
- */
-function handleScrollEvent(e) {
-    const el = e.target;
-    // ignore events not from our scrollable elements
-    if (!el || !el.dataset || el.dataset.scrollSyncAttached !== '1') return;
-
-    const left = el.scrollLeft;
-    if (left === globalScrollLeft) return;
-
-    _scrollSyncPending.left = left;
-    _scrollSyncPending.source = el;
-
-    if (_scrollSyncRafId !== null) return;
-    _scrollSyncRafId = requestAnimationFrame(() => {
-        const pending = _scrollSyncPending.left;
-        globalScrollLeft = pending;
-        const list = Array.from(document.querySelectorAll('[data-scrollable]'));
-        for (const o of list) {
-            if (o !== _scrollSyncPending.source) o.scrollLeft = pending;
-        }
-        _scrollSyncPending.source = null;
-        _scrollSyncRafId = null;
-    });
 }
 function generateUniqueId() {
     return `list-${Math.random().toString(36).substring(2, 9)}`;
@@ -1452,7 +1412,6 @@ function renderRecrs() {
         const recrColumn = document.createElement("div");
         recrColumn.id = "recr-calendar-column";
         recrColumn.className = "calendar-column";
-        recrColumn.setAttribute("data-scrollable", "");
 
         const recrTable = renderCalendar('recr-calendar-table', tasksToShow, createRecrCalendarRow);
         recrColumn.appendChild(recrTable);
@@ -1463,6 +1422,11 @@ function renderRecrs() {
             recrTable.addEventListener("click", onRecrCalendarClick);
             const thead = recrTable.querySelector("thead");
             thead.addEventListener("click", toggleHoliday);
+        }
+        if (!isShowOneday) {
+            recrColumn.setAttribute("data-scrollable", "");
+            recrColumn.scrollLeft = scrollCache.recr;
+            recrColumn.addEventListener('scroll', () => { scrollCache.recr = recrColumn.scrollLeft; }, { passive: true });
         }
     }
 
@@ -1593,7 +1557,6 @@ function renderGantt() {
         const ganttColumn = document.createElement("div");
         ganttColumn.id = "gantt-calendar-column";
         ganttColumn.className = "calendar-column";
-        ganttColumn.setAttribute("data-scrollable", "");
 
         const ganttTable = renderCalendar('gantt-calendar-table', tasksToShow, createGanttCalendarRow);
         ganttColumn.appendChild(ganttTable);
@@ -1604,6 +1567,11 @@ function renderGantt() {
             ganttTable.addEventListener("click", onGanttCalendarClick);
             const thead = ganttTable.querySelector("thead");
             thead.addEventListener("click", toggleHoliday);
+        }
+        if (!isShowOneday) {
+            ganttColumn.setAttribute("data-scrollable", "");
+            ganttColumn.scrollLeft = scrollCache.gantt;
+            ganttColumn.addEventListener('scroll', () => { scrollCache.gantt = ganttColumn.scrollLeft; }, { passive: true });
         }
     }
 
