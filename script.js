@@ -45,7 +45,11 @@ const colors = [
 const MAX_UNDO = 30;
 const KEYS = {
     LAST_USER: "lastUser",
-    LAST_MONTH: "lastMonth"
+    LAST_MONTH: "lastMonth",
+    IS_SORTABLE: "isSortableEnabled",
+    SHOW_ONEDAY: "isShowOneday",
+    SHOW_TASKLIST: "isShowTaskList",
+    EDIT_LOCK: "isEditLocked"
 };
 const idMapRecr = new Map();
 const idMapGantt = new Map();
@@ -1164,6 +1168,7 @@ function refreshToggleSortableBtn() {
 }
 function toggleSortable() {
     isSortableEnabled = !isSortableEnabled;
+    localSave(KEYS.IS_SORTABLE, JSON.stringify(isSortableEnabled));
     const sortableContainers = document.querySelectorAll(".task-tree");
     sortableContainers.forEach(container => {
         if (container.sortableInstance) {
@@ -1213,6 +1218,7 @@ function refreshDateInputVisible() {
 }
 function toggleShowOneday() {
     isShowOneday = !isShowOneday;
+    localSave(KEYS.SHOW_ONEDAY, JSON.stringify(isShowOneday));
     refreshShowOnedayBtn();
     refreshToggleTaskListBtn();
     refreshDateInputVisible();
@@ -1220,6 +1226,7 @@ function toggleShowOneday() {
 }
 function toggleShowTasksList() {
     isShowTaskList = !isShowTaskList;
+    localSave(KEYS.SHOW_TASKLIST, JSON.stringify(isShowTaskList));
     refreshToggleTaskListBtn();
     refreshAll();
 }
@@ -1239,6 +1246,7 @@ function refreshEditLockBtn() {
 }
 function toggleEditLock() {
     isEditLocked = !isEditLocked;
+    localSave(KEYS.EDIT_LOCK, JSON.stringify(isEditLocked));
     refreshEditLockBtn();
     refreshAll();
 }
@@ -1322,6 +1330,19 @@ function renderCalendar(tableId, tasks, rowCreator) {
 // 4b. Render
 // ===========================
 function renderControls() {
+    // restore persisted UI state
+    try {
+        const sSortable = localLoad(KEYS.IS_SORTABLE);
+        if (sSortable !== null) isSortableEnabled = JSON.parse(sSortable);
+        const sShowOne = localLoad(KEYS.SHOW_ONEDAY);
+        if (sShowOne !== null) isShowOneday = JSON.parse(sShowOne);
+        const sShowList = localLoad(KEYS.SHOW_TASKLIST);
+        if (sShowList !== null) isShowTaskList = JSON.parse(sShowList);
+        const sEdit = localLoad(KEYS.EDIT_LOCK);
+        if (sEdit !== null) isEditLocked = JSON.parse(sEdit);
+    } catch (e) {
+        console.warn('Failed to parse saved UI state', e);
+    }
     clearChildren(controls);
 
     toggleEditLockBtn = document.createElement("button");
