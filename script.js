@@ -1565,8 +1565,8 @@ function renderGantt() {
 
         if (!isEditLocked) {
             ganttTable.addEventListener("click", onGanttCalendarClick);
-            const thead = ganttTable.querySelector("thead");
-            thead.addEventListener("click", toggleHoliday);
+            //const thead = ganttTable.querySelector("thead");
+            //thead.addEventListener("click", toggleHoliday);
         }
         if (!isShowOneday) {
             ganttColumn.setAttribute("data-scrollable", "");
