@@ -1318,6 +1318,13 @@ function renderCalendar(tableId, tasks, rowCreator) {
         th.title = '點擊設定 / 取消休假日';
         if (holidayDates.has(ds)) th.classList.add('holiday');
         if (ds === todayStr) th.classList.add('today');
+        
+        // 檢查是否為周末（0=Sunday, 6=Saturday）
+        const date = parseDate(ds);
+        if (date.getDay() === 0 || date.getDay() === 6) {
+            th.classList.add('weekend');
+        }
+        
         headerRow.appendChild(th);
     });
     thead.appendChild(headerRow);

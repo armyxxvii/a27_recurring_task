@@ -343,6 +343,10 @@ table {
             background: #0d02;
         }
 
+        table th.weekend {
+            color: #494 !important;
+        }
+
         table th.holiday, table td.holiday {
             border: none;
             background: #a007;
