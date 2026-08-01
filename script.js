@@ -533,12 +533,16 @@ function getShowRecrs() {
 
         if (task.completionDates.some(date => date === calendarSelected.value)) return true;
 
-        // 使用 diffDays 判斷是否為過期（diff < 0 表示過期）
-        const latest = task.completionDates[0];
-        if (!latest || !calendarSelected.value) return false;
+        // 該日是否已過期：找到該日期之前最近的完成日期，計算下次排程是否已過期
+        const selectedDate = parseDate(calendarSelected.value);
+        
+        // 找出所有早於或等於選定日期的完成日期中最新的那個
+        const prevCompDate = task.completionDates.find(date => parseDate(date) <= selectedDate);
+        if (!prevCompDate || !calendarSelected.value) return false;
 
-        const d = diffDays(task, latest, calendarSelected.value);
-        return Number.isFinite(d) && d < 0;
+        const d = diffDays(task, prevCompDate, calendarSelected.value);
+        // diffDays < 0 表示下一次排程已經過期
+        return Number.isFinite(d) && d <= 1;
     }
 
     if (!isShowOneday) return rootRecr.children;
